@@ -3,6 +3,7 @@ import { Logo } from './components/Logo'
 import { SearchBar } from './components/SearchBar'
 import { ExampleChips } from './components/ExampleChips'
 import { ResultCard } from './components/ResultCard'
+import { ResultsSkeleton } from './components/ResultsSkeleton'
 import { runQuery } from './lib/api'
 import type { QueryResponse } from './lib/api'
 
@@ -48,7 +49,9 @@ function App() {
           </p>
         )}
 
-        {response && (
+        {loading && <ResultsSkeleton />}
+
+        {!loading && response && (
           <section className="flex w-full flex-col gap-6">
             <div className="rounded-2xl border border-white/10 bg-slate-surface/60 p-4 text-sm text-cool-gray">
               <span className="text-off-white">Parsed as: </span>
