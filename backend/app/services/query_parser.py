@@ -14,12 +14,9 @@ keyword lists don't cover -- that's expected of a stand-in, not a bug.
 import re
 
 from app.schema import Garment, ParsedQuery
+from app.services.colors import COLOR_HEX
 
-COLORS = [
-    "red", "white", "black", "blue", "yellow", "green", "grey", "gray",
-    "navy", "amber", "beige", "brown", "denim", "khaki", "nude", "orange",
-    "pink", "purple", "tan",
-]
+COLORS = list(COLOR_HEX)
 
 # garment type -> slot it occupies
 GARMENT_SLOTS = {

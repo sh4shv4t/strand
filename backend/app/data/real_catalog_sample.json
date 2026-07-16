@@ -1,0 +1,912 @@
+[
+  {
+    "id": "fp_2083",
+    "garments": [
+      {
+        "slot": "accessory",
+        "type": "belt",
+        "color": null
+      },
+      {
+        "slot": "outerwear",
+        "type": "jacket",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "shirt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "belt (accessory), jacket (outerwear), shirt (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_5593",
+    "garments": [
+      {
+        "slot": "accessory",
+        "type": "bag",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "bag (accessory), dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_6410",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "lower",
+        "type": "pants",
+        "color": null
+      },
+      {
+        "slot": "outerwear",
+        "type": "jacket",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "belt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), pants (lower), jacket (outerwear), belt (accessory)",
+    "swatch": []
+  },
+  {
+    "id": "fp_7487",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "lower",
+        "type": "pants",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "t-shirt (upper), shoe (footwear), pants (lower)",
+    "swatch": []
+  },
+  {
+    "id": "fp_7731",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "shorts",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "outerwear",
+        "type": "coat",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shorts (lower), t-shirt (upper), coat (outerwear), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_7780",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "shorts",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shorts (lower), t-shirt (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8081",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "pants",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "bag",
+        "color": null
+      },
+      {
+        "slot": "outerwear",
+        "type": "jacket",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "pants (lower), t-shirt (upper), bag (accessory), jacket (outerwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8337",
+    "garments": [
+      {
+        "slot": "accessory",
+        "type": "hat",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "lower",
+        "type": "shorts",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "hat (accessory), t-shirt (upper), shorts (lower), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8457",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8519",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8554",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "shirt",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "glove",
+        "color": null
+      },
+      {
+        "slot": "lower",
+        "type": "pants",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shirt (upper), shoe (footwear), glove (accessory), pants (lower)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8597",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8610",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "pants",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "pants (lower), t-shirt (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8671",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "lower",
+        "type": "skirt",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "bag",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), skirt (lower), t-shirt (upper), bag (accessory)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8712",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "skirt",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "skirt (lower), t-shirt (upper), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8810",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "lower",
+        "type": "shorts",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "t-shirt (upper), shorts (lower), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8875",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "pants",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "outerwear",
+        "type": "cape",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "belt",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "pants (lower), shoe (footwear), cape (outerwear), belt (accessory), t-shirt (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8902",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8935",
+    "garments": [
+      {
+        "slot": "outerwear",
+        "type": "coat",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "coat (outerwear), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8947",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8950",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "skirt",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "outerwear",
+        "type": "jacket",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "skirt (lower), t-shirt (upper), jacket (outerwear), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8955",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "umbrella",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper), shoe (footwear), umbrella (accessory)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8971",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "outerwear",
+        "type": "jacket",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper), jacket (outerwear), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8976",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "lower",
+        "type": "pants",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "t-shirt (upper), pants (lower)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8980",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "t-shirt (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8985",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper), shoe (footwear)",
+    "swatch": []
+  },
+  {
+    "id": "fp_8988",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "belt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper), belt (accessory)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9014",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "shorts",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "shirt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shorts (lower), shirt (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9016",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9018",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "watch",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), watch (accessory), dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9029",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9030",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9031",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9032",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "belt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper), belt (accessory)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9048",
+    "garments": [
+      {
+        "slot": "lower",
+        "type": "shorts",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shorts (lower), t-shirt (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9069",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), dress (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9077",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "bag",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), dress (upper), bag (accessory)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9082",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "t-shirt",
+        "color": null
+      },
+      {
+        "slot": "lower",
+        "type": "pants",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "t-shirt (upper), pants (lower)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9083",
+    "garments": [
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      },
+      {
+        "slot": "upper",
+        "type": "jumpsuit",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "shoe (footwear), jumpsuit (upper)",
+    "swatch": []
+  },
+  {
+    "id": "fp_9087",
+    "garments": [
+      {
+        "slot": "upper",
+        "type": "dress",
+        "color": null
+      },
+      {
+        "slot": "accessory",
+        "type": "belt",
+        "color": null
+      },
+      {
+        "slot": "footwear",
+        "type": "shoe",
+        "color": null
+      }
+    ],
+    "scene": null,
+    "style": null,
+    "notable": [],
+    "caption": "dress (upper), belt (accessory), shoe (footwear)",
+    "swatch": []
+  }
+]
