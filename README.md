@@ -21,7 +21,10 @@ This repo currently ships a scaffold of that pipeline with mocked data: a hand-w
 strand/
 ├── Working_notes.md      # architecture options, dataset plan, tradeoffs, open decisions
 ├── .github/workflows/ci.yml   # backend pytest + frontend build/lint on push/PR
+├── docker-compose.yml     # backend + frontend, wired together
 ├── backend/
+│   ├── Dockerfile
+│   ├── .env.example       # env vars, documented; sane defaults without a .env at all
 │   ├── scripts/
 │   │   ├── pull_fashionpedia_sample.py   # regenerates real_catalog_sample.json + images
 │   │   ├── eval_baselines.py             # dense-only vs. hybrid comparison
@@ -67,6 +70,14 @@ npm run dev
 ```
 
 The frontend dev server proxies `/api/*` to `http://localhost:8000`. Open the printed local URL (default `http://localhost:5173`).
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+Serves the frontend at `http://localhost:5173` (nginx, proxying `/api/*` server-side to the backend container — no CORS involved) and the backend directly at `http://localhost:8000`. First boot downloads the ~80MB Chroma embedding model before the backend responds to anything; a named volume (`chroma-cache`) persists it so this only happens once. Copy `backend/.env.example` to `backend/.env` and uncomment the `env_file` line in `docker-compose.yml` to pass real env vars through.
 
 ## Testing
 

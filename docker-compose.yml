@@ -1,0 +1,20 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    # env_file: ./backend/.env   # optional -- see backend/.env.example
+    volumes:
+      # persists the ~80MB Chroma embedding model across restarts/rebuilds --
+      # without this, every fresh container re-downloads it on first request.
+      - chroma-cache:/root/.cache/chroma
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  chroma-cache:
