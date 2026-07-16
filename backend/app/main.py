@@ -1,9 +1,11 @@
 import os
 import time
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.observability import logger, tracer
 from app.routers import catalog, index, query
@@ -24,6 +26,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Real Fashionpedia photos, if pulled (pull_fashionpedia_sample.py) -- gitignored
+# and optional, so only mount if present; the frontend degrades gracefully
+# (falls back to swatch-only cards) when a photo 404s.
+_images_dir = Path(__file__).resolve().parent / "data" / "fashionpedia_images"
+if _images_dir.exists():
+    app.mount("/api/images", StaticFiles(directory=_images_dir), name="images")
 
 
 @app.middleware("http")

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ScoredResult } from '../lib/api'
 
 function GarmentChip({
@@ -22,9 +23,20 @@ function GarmentChip({
 
 export function ResultCard({ result }: { result: ScoredResult }) {
   const { record, score, matched_fields } = result
+  const [photoFailed, setPhotoFailed] = useState(false)
+  const showPhoto = record.id.startsWith('fp_') && !photoFailed
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-slate-surface p-5 transition-colors hover:border-indigo/40">
+      {showPhoto && (
+        <img
+          src={`/api/images/${record.id}.jpg`}
+          alt=""
+          className="h-40 w-full rounded-xl object-cover"
+          onError={() => setPhotoFailed(true)}
+        />
+      )}
+
       <div className="flex items-center gap-1.5">
         {record.swatch.map((hex, i) => (
           <span
