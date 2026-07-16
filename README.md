@@ -4,7 +4,7 @@
 
 Compositional fashion image search — retrieval that binds garments, colors, scene, and style as separate fields instead of pooling everything into one embedding, so a query like "a red tie and a white shirt" doesn't also match a white tie and a red shirt.
 
-Built for the Glance ML internship take-home assignment. See [`Working_notes.md`](./Working_notes.md) for the full problem writeup: architecture options considered, dataset plan, and open decisions (the final architecture is intentionally not locked in yet).
+Built for the Glance ML internship take-home assignment. See [`docs/submission.html`](./docs/submission.html) for the submission write-up (approaches considered, the chosen architecture, and future work; open it in a browser or print it to PDF), or [`Working_notes.md`](./Working_notes.md) for the full engineering log the write-up is drawn from.
 
 ## Overview
 
@@ -22,6 +22,8 @@ This repo currently ships a scaffold of that pipeline with mocked data: a hand-w
 ```
 strand/
 ├── Working_notes.md      # architecture options, dataset plan, tradeoffs, open decisions
+├── docs/
+│   └── submission.html    # the assignment's 4-section submission write-up (print-to-PDF for the actual PDF, gitignored)
 ├── .github/workflows/ci.yml   # backend pytest + frontend build/lint on push/PR
 ├── docker-compose.yml     # backend + frontend, wired together
 ├── backend/
@@ -82,6 +84,26 @@ docker compose up --build
 ```
 
 Serves the frontend at `http://localhost:5173` (nginx, proxying `/api/*` server-side to the backend container — no CORS involved) and the backend directly at `http://localhost:8000`. First boot downloads the ~80MB Chroma embedding model before the backend responds to anything; a named volume (`chroma-cache`) persists it so this only happens once. Copy `backend/.env.example` to `backend/.env` and uncomment the `env_file` line in `docker-compose.yml` to pass real env vars through.
+
+## Submission write-up
+
+`docs/submission.html` is the source for the assignment's required PDF (approaches, chosen-architecture write-up, codebase link, future work). Open it directly in a browser, or generate the actual PDF locally:
+
+```bash
+npm install -D playwright
+node -e "
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.goto('file://' + process.cwd() + '/docs/submission.html');
+  await page.pdf({ path: 'docs/Strand_Glance_ML_Submission.pdf', format: 'A4', printBackground: true, margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' } });
+  await browser.close();
+})();
+"
+```
+
+The generated PDF is gitignored (`docs/*.pdf`); the HTML source is the tracked artifact.
 
 ## Testing
 

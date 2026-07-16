@@ -1,6 +1,6 @@
 # Glance ML Internship Assignment — Working Notes (v2)
 
-Status: **all design decisions locked in** — Option D architecture (§2), hosted-API VLM serving, Chroma, the query-parser prompt, repo structure, and dataset scope (all §9). The only thing left open is the weighted-hybrid α, which needs real data/VLM output in the loop to tune against rather than a design call to make ahead of time. Next step is real implementation: replacing the mocked catalog/parser with a real Fashionpedia sample, a real VLM call, and Chroma.
+Status: all design decisions are locked in (§9), the retrieval pipeline runs on real data (Chroma, real Fashionpedia records, a real CLIP-based Part A indexer, §10), it's measured against real baselines (§12), and it has a measured, not just reasoned, scaling estimate (§13). The submission write-up assembled from this log lives at `docs/submission.html` (print it to PDF for the actual submission file, see the README). The one thing still genuinely open is wiring a real vision-language model to fill in color, scene, and style on the real catalog and to replace the keyword-spotting query parser with something truly zero-shot; everything else in the repo is already built against exactly the shape that will take.
 
 ---
 
