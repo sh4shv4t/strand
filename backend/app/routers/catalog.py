@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.schema import ImageRecord
-from app.services.retriever import get_catalog
+from app.services.catalog import get_catalog
 
 router = APIRouter(prefix="/api", tags=["catalog"])
 
