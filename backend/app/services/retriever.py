@@ -14,6 +14,10 @@ _CATALOG: list[ImageRecord] = get_catalog()
 _DENSE_SCORER = DenseScorer(_CATALOG)
 
 
+def get_dense_scorer() -> DenseScorer:
+    return _DENSE_SCORER
+
+
 def _garment_matches(query_garment: Garment, record_garments: list[Garment]) -> bool:
     for rg in record_garments:
         if rg.slot != query_garment.slot:

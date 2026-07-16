@@ -1,7 +1,10 @@
 def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["catalog_size"] > 0
+    assert isinstance(body["using_real_embeddings"], bool)
 
 
 def test_query_endpoint_returns_ranked_results(client):

@@ -1,11 +1,13 @@
 import time
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.observability import logger, tracer
 from app.routers import catalog, index, query
+from app.services.catalog import get_catalog
+from app.services.retriever import get_dense_scorer
 
 app = FastAPI(
     title="Strand API",
@@ -58,5 +60,12 @@ app.include_router(index.router)
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, object]:
+    catalog = get_catalog()
+    if not catalog:
+        raise HTTPException(status_code=503, detail="catalog failed to load (empty)")
+    return {
+        "status": "ok",
+        "catalog_size": len(catalog),
+        "using_real_embeddings": get_dense_scorer().using_real_embeddings,
+    }
