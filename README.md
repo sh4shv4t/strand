@@ -1,5 +1,7 @@
 # Strand
 
+[![CI](https://github.com/sh4shv4t/strand/actions/workflows/ci.yml/badge.svg)](https://github.com/sh4shv4t/strand/actions/workflows/ci.yml)
+
 Compositional fashion image search — retrieval that binds garments, colors, scene, and style as separate fields instead of pooling everything into one embedding, so a query like "a red tie and a white shirt" doesn't also match a white tie and a red shirt.
 
 Built for the Glance ML internship take-home assignment. See [`Working_notes.md`](./Working_notes.md) for the full problem writeup: architecture options considered, dataset plan, and open decisions (the final architecture is intentionally not locked in yet).
