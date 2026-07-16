@@ -1,6 +1,6 @@
 # Glance ML Internship Assignment — Working Notes (v2)
 
-Status: **architecture NOT locked in.** This version lays out the full option space, a real workflow (indexing + serving + querying), and an expanded dataset list. Pick the final approach after you've weighed the tradeoffs below — I've kept my earlier "CHOSEN" framing out on purpose.
+Status: **architecture CHOSEN — Option D** (structured VLM attribute extraction → symbolic schema + dense fallback; see §2). This version lays out the full option space, a real workflow (indexing + serving + querying), and an expanded dataset list, and locks in D as the path forward; §2, §9, and §10 reflect that decision. The remaining open decisions (VLM serving mode, query-parser prompt, vector DB choice, etc.) are tracked in §9.
 
 ---
 
@@ -13,7 +13,7 @@ Status: **architecture NOT locked in.** This version lays out the full option sp
 
 ---
 
-## 2. Candidate architectures (tradeoff table — nothing chosen yet)
+## 2. Candidate architectures (tradeoff table — Option D chosen, see below)
 
 ### Option A — Vanilla CLIP / SigLIP whole-image embedding
 Baseline only. Given as the anti-pattern in the prompt itself. Fails query 5 by construction, and does poorly on query 3/4 (contextual/style inference) since a single vector under-weights secondary attributes. Zero eng cost, zero fashion awareness. Use only as your reported baseline number, not your submission.
@@ -24,7 +24,7 @@ Swap the backbone for a fashion-tuned one. Better recall on garment vocabulary a
 ### Option C — Region/detection-based compositional retrieval
 Detect each garment (bbox) with a fashion object detector (DeepFashion2-trained, or a general detector like YOLO fine-tuned on Fashionpedia's segmentation masks), embed each region + classify its color independently, then match query sub-phrases to regions. Solves compositionality *by construction* — this is structurally what Pinterest's Shop-the-Look and Myntra's My Stylist actually do in production (both name a dedicated detection step as stage one of their pipeline, before any embedding). Highest fidelity on query 5, but needs a trained/fine-tuned detector — higher eng cost, and the assignment explicitly asks you to *not* over-invest in engineering-heavy indexing infrastructure. Worth citing as the "correct at scale" answer in your future-work section even if you don't build it fully.
 
-### Option D — Structured VLM attribute extraction → symbolic schema + dense fallback
+### Option D — Structured VLM attribute extraction → symbolic schema + dense fallback ✅ CHOSEN
 A VLM (or small fine-tuned model) emits a fixed JSON schema per image at index time:
 ```
 {garments: [{slot: upper/lower/outerwear/footwear, type, color}],
@@ -37,7 +37,7 @@ Query time: an LLM parses the NL query into the same schema; retrieval = symboli
 ### Option E — Hybrid: coarse detection + structured attributes (no full re-ID)
 A middle ground between C and D: instead of a full fashion object detector, use lightweight crop heuristics (simple upper/lower/outerwear region heuristics from pose estimation, or just quadrant-based crops since most fashion photos are single-person full-body shots) to get 2–3 rough garment crops, then run the VLM/attribute-extraction step *per crop* instead of on the whole image. Gets you most of Option C's binding accuracy without training a real detector — pose estimation models (e.g. MediaPipe Pose, MMPose) are pretrained and off-the-shelf. Medium eng cost, good compositionality, no detector fine-tuning needed. This is probably the best "shows ML judgment without over-engineering" answer for a take-home.
 
-**My honest read:** D is the safest, fastest-to-build, cleanly-fashion-aware answer and matches the assignment's "don't over-invest in indexing engineering" instruction almost exactly. E is a stronger answer if you have 1–2 extra days and want to visibly beat pure-CLIP on the compositional query without building a full detector. C is what you cite as "what production does at scale" in the future-work section. Your call — happy to help scaffold whichever you pick.
+**Decision:** going with D. It's the safest, fastest-to-build, cleanly-fashion-aware answer and matches the assignment's "don't over-invest in indexing engineering" instruction almost exactly — and the scaffold's schema/parser/retriever contracts were already built against it, so no rework is needed to lock it in. E remains a natural extension (pose/crop step before the VLM call) worth a paragraph in future-work if there's time to spare, not a requirement. C is cite-only — "what production does at scale" — in the future-work section.
 
 ---
 
@@ -140,7 +140,7 @@ Fashionpedia alone is sufficient to hit the 500–1000 image / 3-axis requiremen
 
 ## 9. Open decisions / TODO
 
-- [ ] **Pick the architecture** from §2 (D is fastest to build and cleanest fit for the assignment's constraints; E is the stronger differentiator if you have extra time; C is cite-only unless you want a bigger lift).
+- [x] **Pick the architecture** from §2 — **Option D chosen** (structured VLM attribute extraction → symbolic schema + dense fallback).
 - [ ] Which serving mode for the VLM — self-hosted local vs. API (see §4.2 tradeoffs).
 - [ ] Exact few-shot prompt/schema for the LLM query parser.
 - [ ] Qdrant vs Chroma — pick based on ease of hybrid filter+ANN setup in whichever client library you're more comfortable with.
@@ -152,11 +152,11 @@ Fashionpedia alone is sufficient to hit the 500–1000 image / 3-axis requiremen
 
 ## 10. Scaffold status (this repo)
 
-The current repo implements a **mocked stand-in** for the Option D pipeline described above, so the API contract and UI are usable before any real model/dataset integration:
+The current repo implements a **mocked stand-in** for the chosen Option D pipeline, so the API contract and UI are usable before any real model/dataset integration:
 
 - `backend/app/services/query_parser.py` — rule-based keyword-spotting parser standing in for the LLM query parser in §4.3. Same output schema, swap the implementation later without touching the API surface.
 - `backend/app/data/sample_catalog.json` — ~10 hand-written mock image records in the exact JSON schema from §2 Option D, standing in for the indexed Fashionpedia sample.
 - `backend/app/services/retriever.py` — implements the weighted hybrid from §3 (`score = α·symbolic_match + (1-α)·dense_overlap`) against the mock catalog.
 - `backend/app/routers/index.py` — `/api/index` is a stub that documents where the real offline indexing loop (§4.1) would plug in; it does not run a VLM or write to a vector DB yet.
 
-None of the open decisions in §9 are resolved by this scaffold — it exists to make the retrieval *logic* (weighted hybrid, schema shape, query→result flow) testable end-to-end ahead of picking a final architecture and real dataset/model integration.
+The architecture decision is resolved (§9); the remaining open decisions (VLM serving mode, query-parser prompt, vector DB choice, dataset pull scope) are not — this scaffold exists to make the retrieval *logic* (weighted hybrid, schema shape, query→result flow) testable end-to-end ahead of that real dataset/model integration.
