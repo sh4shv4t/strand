@@ -44,6 +44,19 @@ def test_no_structured_signal_gives_zero_symbolic_score():
     assert all(r.symbolic_score == 0.0 for r in results)
 
 
+def test_no_structured_signal_uses_dense_score_at_full_strength():
+    """A query the parser recognizes nothing in is a genuinely zero-shot
+    query. The final score should equal the dense score exactly (alpha=0
+    in that case), not the dense score discounted by a fixed alpha that
+    was only ever meant to weight a symbolic signal that doesn't exist
+    here. Without this, a perfect dense match would misleadingly show as
+    a 40% match instead of 100%."""
+    parsed = ParsedQuery(raw_query="some free text with no schema signal")
+    results = search(parsed, top_k=len(get_catalog()), alpha=0.6)
+    for r in results:
+        assert r.score == r.dense_score
+
+
 def test_scene_and_style_match_contribute_to_score():
     parsed = ParsedQuery(raw_query="office style query", scene="office", style="business")
     results = search(parsed, top_k=len(get_catalog()))

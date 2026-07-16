@@ -3,7 +3,13 @@
 Implements `score = alpha * symbolic_match + (1 - alpha) * dense_similarity`
 from Working_notes.md Section 3. Symbolic matching lives here; dense
 similarity is delegated to vector_store.DenseScorer, and catalog loading to
-catalog.load_catalog -- this module only blends the two.
+catalog.load_catalog, this module only blends the two.
+
+Falls back to alpha=0 for queries with no structured signal at all (see
+_has_structured_signal): with no garments, scene, or style recognized,
+symbolic_score is 0.0 for every record, so the query is genuinely zero-shot
+and dense similarity should be reported at full strength rather than
+discounted for a symbolic signal that doesn't exist.
 """
 
 from app.schema import Garment, ImageRecord, ParsedQuery, ScoredResult
@@ -57,14 +63,28 @@ def _symbolic_score(parsed: ParsedQuery, record: ImageRecord) -> tuple[float, li
     return matched_count / total_fields, matched_fields
 
 
+def _has_structured_signal(parsed: ParsedQuery) -> bool:
+    return bool(parsed.garments or parsed.scene or parsed.style)
+
+
 def search(parsed: ParsedQuery, top_k: int = 5, alpha: float = 0.6) -> list[ScoredResult]:
+    # When the parser recognizes nothing (a query outside its keyword
+    # vocabulary), symbolic_score is 0.0 for every record regardless of
+    # alpha, so this is a genuinely zero-shot query: dense similarity is
+    # the only real signal available. Discounting it by (1 - alpha) here
+    # doesn't change the ranking (every record is scaled the same amount),
+    # but it does understate how good the match actually is -- a perfect
+    # dense hit would otherwise show as a 40% match instead of 100%. Using
+    # alpha=0 in this case reports the dense score at full strength.
+    effective_alpha = alpha if _has_structured_signal(parsed) else 0.0
+
     dense_scores = _DENSE_SCORER.score(parsed.raw_query)
     scored: list[ScoredResult] = []
 
     for record in _CATALOG:
         symbolic, matched_fields = _symbolic_score(parsed, record)
         dense = dense_scores.get(record.id, 0.0)
-        score = alpha * symbolic + (1 - alpha) * dense
+        score = effective_alpha * symbolic + (1 - effective_alpha) * dense
 
         scored.append(
             ScoredResult(
