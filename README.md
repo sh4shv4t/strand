@@ -23,7 +23,9 @@ strand/
 ├── .github/workflows/ci.yml   # backend pytest + frontend build/lint on push/PR
 ├── backend/
 │   ├── scripts/
-│   │   └── pull_fashionpedia_sample.py   # regenerates real_catalog_sample.json
+│   │   ├── pull_fashionpedia_sample.py   # regenerates real_catalog_sample.json + images
+│   │   ├── eval_baselines.py             # dense-only vs. hybrid comparison
+│   │   └── eval_clip_baseline.py         # real vanilla-CLIP image baseline
 │   ├── tests/                  # pytest suite, see Testing below
 │   └── app/
 │       ├── schema.py          # Pydantic models for the garment/scene/style JSON schema
@@ -75,6 +77,17 @@ pytest -v
 
 Tests run with `STRAND_DISABLE_EMBEDDINGS=1` (set in `tests/conftest.py`) so they exercise the deterministic word-overlap fallback instead of downloading the real embedding model — fast and network-independent. `tests/test_eval_accuracy.py` runs the 5 canonical eval queries from `Working_notes.md` end to end and checks retrieval accuracy, not just unit-level correctness. CI (`.github/workflows/ci.yml`) runs this suite plus a frontend build/lint on every push and PR.
 
+## Baseline comparison
+
+```bash
+cd backend
+python scripts/eval_baselines.py                      # dense-only vs. hybrid, no new deps
+pip install -r scripts/requirements-eval.txt
+python scripts/eval_clip_baseline.py                   # real vanilla-CLIP image baseline
+```
+
+Real numbers, not just theory: dense-only ties the hybrid on the 5 curated eval queries, but produces an *exact* score tie on the compositional decoy pair (it truly cannot tell "red tie, white shirt" from "white tie, red shirt" apart), while real vanilla CLIP on actual Fashionpedia photos scores worse than even that dense fallback (mean recall@5 0.256 vs. 0.564) on single-garment queries. See `Working_notes.md` §12 for the full breakdown and caveats.
+
 ## API
 
 | Method | Path | Description |
@@ -91,4 +104,4 @@ Partway from mocked to real, not a finished system:
 - The query parser is keyword-spotting, not an LLM — a prompt to replace it is already drafted in `Working_notes.md` §4.3.1.
 - Dense retrieval uses real embeddings (Chroma, local, no API key); symbolic retrieval and the weighted-hybrid blend are real. No VLM is integrated yet, so the fields it would fill in stay empty.
 
-See `Working_notes.md` sections 9–11 for the full list of decisions made, what's still open, and the testing/CI/observability setup.
+See `Working_notes.md` sections 9–12 for the full list of decisions made, what's still open, the testing/CI/observability setup, and the empirical baseline comparison.

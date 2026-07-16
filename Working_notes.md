@@ -215,3 +215,44 @@ The architecture decision is resolved (§9); the remaining open decisions (VLM s
 - **CI** (`.github/workflows/ci.yml`): two jobs on push/PR — backend (`pytest`) and frontend (`npm run lint` + `npm run build`). No deploy step; this is correctness/regression gating, not a release pipeline.
 - **Observability** (`backend/app/observability.py`): structured logging to stdout plus OpenTelemetry tracing with a `ConsoleSpanExporter` — spans print alongside the logs. No collector, agent, or external service to stand up or ever touch again; swapping to a real backend later (Jaeger, Honeycomb, etc.) is a one-line change to the exporter, not new instrumentation. A request-logging/tracing middleware wraps every call in `main.py`, and `/api/query` additionally traces the parse and retrieve steps as child spans.
 - **Error handling**: a generic `Exception` handler in `main.py` catches anything unhandled, logs it, and returns a structured `{"error": "internal_error", "detail": ...}` 500 instead of leaking a raw traceback. FastAPI's own `HTTPException` handling (used by the `/api/index` 501 stub) is untouched — Starlette resolves the more specific handler first.
+
+---
+
+## 12. Empirical baseline comparison
+
+Two tiers, both run against the real 40-image Fashionpedia sample (not just the mock decoy pair), to put actual numbers behind the "single pooled embedding vs. structured schema" argument from §1/§2 instead of leaving it theoretical.
+
+### 12.1 Tier 1 — dense-only (alpha=0) vs. our hybrid (alpha=0.6)
+
+`backend/scripts/eval_baselines.py`, pinned as regression tests in `backend/tests/test_baselines.py`. On the 5 canonical eval queries from §6, both score 5/5 top-1 accuracy — the curated queries alone aren't adversarial enough to break dense-only retrieval outright. The compositional decoy test is where the difference actually shows up:
+
+```
+Compositional decoy test (img_005 = true match, img_006 = color-swapped decoy):
+  dense-only:  img_005=0.6667  img_006=0.6667  gap=+0.0000
+  hybrid:      img_005=0.8667  img_006=0.4667  gap=+0.4000
+```
+
+Dense-only produces an **exact tie** between the correct answer and its color-swapped decoy — not just a close call, a literal tie, because bag-of-words captions are identical regardless of which word attaches to which garment. This is the cleanest possible demonstration of the failure mode §1 describes. The hybrid resolves it via the symbolic layer alone.
+
+### 12.2 Tier 2 — real vanilla-CLIP image baseline (Option A, literally) vs. our system
+
+`backend/scripts/eval_clip_baseline.py` (deps in `backend/scripts/requirements-eval.txt`: `datasets`, `pillow`, `open_clip_torch` — not part of the app's own requirements, this is offline eval tooling, not something the running app needs). Embeds the actual 40 real Fashionpedia photos with `open_clip` (`ViT-B-32`, `openai` weights) and runs zero-shot text-image similarity for 8 single-garment probe queries (types appearing ≥3× in the sample and recognized by `query_parser.py`'s vocabulary, so the symbolic layer gets a fair chance to engage for all three methods). Ground truth is Fashionpedia's own category labels — real data, not invented.
+
+```
+probe query        #relevant  CLIP r@5   dense-only r@5   hybrid r@5
+----------------------------------------------------------------------
+a pair of shoes    25         0.12       0.12             0.12
+a dress            19         0.26       0.26             0.26
+a t-shirt          15         0.27       0.33             0.33
+pants              8          0.00       0.62             0.62
+shorts             6          0.67       0.83             0.83
+a jacket           5          0.40       1.00             1.00
+a shirt            3          0.33       0.33             1.00
+a skirt            3          0.00       1.00             1.00
+----------------------------------------------------------------------
+mean recall@5 -- CLIP: 0.256  dense-only: 0.564  hybrid: 0.647
+```
+
+Real vanilla CLIP scores worse than even our word-overlap dense fallback, and well below the hybrid. **Caveat, stated plainly so this doesn't overclaim**: this isn't purely "CLIP is bad" — our dense/hybrid methods have privileged access to Fashionpedia's own ground-truth category labels baked directly into each record's caption (e.g. `"jacket (outerwear)"`), while CLIP has to recognize the garment from pixels alone with a generic, non-prompt-engineered query. That asymmetry is real. But it's also *exactly* the point this whole project is built on: extracting structured labels up front (whether from dataset ground truth or a VLM) and matching symbolically is a more reliable foundation than asking a single embedding — image or text — to carry that entire semantic burden zero-shot. Tier 2 puts a real number behind that argument instead of leaving it theoretical; the `"a shirt"` row (dense-only 0.33 → hybrid 1.00) is the cleanest single-query evidence that the symbolic layer earns its keep beyond just the decoy test.
+
+Neither script runs in CI — both need real network access, real model downloads (CLIP weights, ~350MB) and real images on disk, which is exactly the kind of flakiness §11 already deliberately keeps out of the test suite. They're `pull_fashionpedia_sample.py`'s regenerable images plus a manual `python scripts/eval_clip_baseline.py` when you want fresh numbers.
