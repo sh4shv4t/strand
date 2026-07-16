@@ -1,0 +1,152 @@
+[
+  {
+    "id": "img_001",
+    "garments": [
+      { "slot": "outerwear", "type": "raincoat", "color": "yellow" }
+    ],
+    "scene": "street",
+    "style": "casual",
+    "notable": ["puddle reflection", "overcast sky"],
+    "caption": "a bright yellow raincoat, casual style, street setting",
+    "swatch": ["#F5C542"]
+  },
+  {
+    "id": "img_002",
+    "garments": [
+      { "slot": "upper", "type": "shirt", "color": "white" },
+      { "slot": "lower", "type": "trousers", "color": "black" },
+      { "slot": "outerwear", "type": "blazer", "color": "navy" }
+    ],
+    "scene": "office",
+    "style": "business",
+    "notable": ["glass conference room", "laptop on desk"],
+    "caption": "professional business attire, white shirt, black trousers, navy blazer, modern office setting",
+    "swatch": ["#F8FAFC", "#1F2430", "#1E2A5E"]
+  },
+  {
+    "id": "img_003",
+    "garments": [
+      { "slot": "upper", "type": "shirt", "color": "blue" },
+      { "slot": "lower", "type": "shorts", "color": "khaki" }
+    ],
+    "scene": "park",
+    "style": "casual",
+    "notable": ["sitting on a park bench", "trees in background"],
+    "caption": "a blue shirt, casual style, sitting on a park bench in a park setting",
+    "swatch": ["#3B6FD6", "#C3B091"]
+  },
+  {
+    "id": "img_004",
+    "garments": [
+      { "slot": "upper", "type": "hoodie", "color": "grey" },
+      { "slot": "lower", "type": "jeans", "color": "blue" },
+      { "slot": "footwear", "type": "sneakers", "color": "white" }
+    ],
+    "scene": "street",
+    "style": "casual",
+    "notable": ["crosswalk", "city walk"],
+    "caption": "casual weekend outfit, grey hoodie, blue jeans, white sneakers, city street setting",
+    "swatch": ["#94A3B8", "#3B5BA5", "#F8FAFC"]
+  },
+  {
+    "id": "img_005",
+    "garments": [
+      { "slot": "upper", "type": "shirt", "color": "white" },
+      { "slot": "accessory", "type": "tie", "color": "red" },
+      { "slot": "outerwear", "type": "blazer", "color": "navy" }
+    ],
+    "scene": "office",
+    "style": "formal",
+    "notable": ["formal setting", "boardroom"],
+    "caption": "a red tie and a white shirt, navy blazer, formal setting, office",
+    "swatch": ["#F8FAFC", "#DC2626", "#1E2A5E"]
+  },
+  {
+    "id": "img_006",
+    "garments": [
+      { "slot": "upper", "type": "shirt", "color": "red" },
+      { "slot": "accessory", "type": "tie", "color": "white" },
+      { "slot": "outerwear", "type": "blazer", "color": "black" }
+    ],
+    "scene": "office",
+    "style": "formal",
+    "notable": ["color-swapped decoy for compositional binding test"],
+    "caption": "a white tie and a red shirt, black blazer, formal setting, office",
+    "swatch": ["#DC2626", "#F8FAFC", "#111318"]
+  },
+  {
+    "id": "img_007",
+    "garments": [
+      { "slot": "upper", "type": "dress", "color": "green" }
+    ],
+    "scene": "home",
+    "style": "casual",
+    "notable": ["reading on the couch", "indoor plants"],
+    "caption": "a green dress, casual style, relaxed home setting",
+    "swatch": ["#10B981"]
+  },
+  {
+    "id": "img_008",
+    "garments": [
+      { "slot": "upper", "type": "tank top", "color": "black" },
+      { "slot": "lower", "type": "leggings", "color": "black" },
+      { "slot": "footwear", "type": "sneakers", "color": "black" }
+    ],
+    "scene": "street",
+    "style": "athleisure",
+    "notable": ["running", "morning light"],
+    "caption": "black tank top and leggings, black sneakers, athleisure style, street setting",
+    "swatch": ["#111318", "#111318", "#111318"]
+  },
+  {
+    "id": "img_009",
+    "garments": [
+      { "slot": "outerwear", "type": "jacket", "color": "amber" },
+      { "slot": "lower", "type": "jeans", "color": "black" }
+    ],
+    "scene": "park",
+    "style": "casual",
+    "notable": ["autumn leaves", "golden hour"],
+    "caption": "an amber jacket, black jeans, casual style, park setting at golden hour",
+    "swatch": ["#F59E0B", "#111318"]
+  },
+  {
+    "id": "img_010",
+    "garments": [
+      { "slot": "upper", "type": "hoodie", "color": "navy" },
+      { "slot": "lower", "type": "joggers", "color": "grey" },
+      { "slot": "footwear", "type": "sneakers", "color": "white" }
+    ],
+    "scene": "home",
+    "style": "athleisure",
+    "notable": ["home gym", "yoga mat"],
+    "caption": "navy hoodie, grey joggers, white sneakers, athleisure style, home setting",
+    "swatch": ["#1E2A5E", "#94A3B8", "#F8FAFC"]
+  },
+  {
+    "id": "img_011",
+    "garments": [
+      { "slot": "upper", "type": "blouse", "color": "white" },
+      { "slot": "lower", "type": "skirt", "color": "beige" },
+      { "slot": "footwear", "type": "heels", "color": "nude" }
+    ],
+    "scene": "office",
+    "style": "business",
+    "notable": ["reception desk", "natural light"],
+    "caption": "white blouse, beige skirt, nude heels, business style, modern office setting",
+    "swatch": ["#F8FAFC", "#D9C8A9", "#D8B79A"]
+  },
+  {
+    "id": "img_012",
+    "garments": [
+      { "slot": "upper", "type": "t-shirt", "color": "white" },
+      { "slot": "lower", "type": "shorts", "color": "denim" },
+      { "slot": "footwear", "type": "sandals", "color": "brown" }
+    ],
+    "scene": "street",
+    "style": "casual",
+    "notable": ["ice cream in hand", "sunny weekend"],
+    "caption": "white t-shirt, denim shorts, brown sandals, casual weekend style, city street setting",
+    "swatch": ["#F8FAFC", "#4C6B8A", "#8B5E3C"]
+  }
+]
