@@ -76,7 +76,7 @@ This directly answers "how will you serve the models" — worth a short paragrap
 | VLM (attribute extractor) | Index-time, batch | ✅ **Chosen: hosted API** (Gemini Flash / GPT-4o-mini) called in a batch loop | One-time or delta batch job over 500–1000 images, no real-time requirement — chosen over self-hosting (Florence-2-large / Qwen2-VL-2B) purely for least setup friction: no checkpoint download, no local GPU/quantization plumbing, just an API key and a batch loop. Self-hosting stays a valid future-work swap if API cost/rate-limits become a problem at larger scale |
 | Fashion dense encoder (Marqo-FashionCLIP/SigLIP) | Index-time (image) + query-time (text) | Self-hosted, local inference | ~150–400M params, trivial on a 4GB GPU or even CPU; load once, keep resident in a small FastAPI service or just in-process in your retriever script |
 | LLM query parser | Query-time only | API call (no local hosting needed) | Runtime latency matters here since it's per-query, not per-image — a small/fast model (e.g. a mini-tier model) with a few-shot prompt is enough; this is the actual bottleneck at high query volume, not the vector search |
-| Vector DB (Qdrant/Chroma) | Both | Local process or lightweight server, CPU-only | No GPU needed; supports ANN + payload/metadata filter in one call |
+| Vector DB — ✅ **Chosen: Chroma** | Both | Embedded, in-process (`pip install chromadb`, no separate server) | Lowest setup friction of the two: Qdrant needs a running service (Docker or Cloud) even for local dev, Chroma runs in-process with a local persistence directory and still supports ANN + metadata filter in one call. Qdrant remains the natural swap if this needs to run as a standalone service later (sharding/read-replicas, §4.4) |
 
 Your dev machine (RTX 3050, 4GB VRAM + i7) is fine for all of this — the only thing that would actually stress it is *fine-tuning* a VLM, which none of these options require (Fashion Florence-style fine-tuning is a nice-to-mention future-work stretch goal, not a requirement here).
 
@@ -86,6 +86,45 @@ Your dev machine (RTX 3050, 4GB VRAM + i7) is fine for all of this — the only 
 3. **Retrieval**: run your chosen scoring strategy (weighted hybrid / cascade / rerank) against the precomputed store — symbolic filter on schema fields intersected/blended with dense cosine similarity on the flattened caption.
 4. **Return top-k** image IDs + scores.
 5. Never call the VLM or detector at query time — only the lightweight parser + ANN lookup touch the query path. This offline/online split is the direct answer to the scalability grading criterion: it's irrelevant at 500 images and is the difference between working and not working at 1M.
+
+#### 4.3.1 ✅ Chosen: query-parser prompt/schema
+
+Same schema on both sides of the parser (index-time VLM output and query-time LLM output), so retrieval never has to reconcile two shapes. System prompt + few-shot, ready to drop into a real LLM call in place of `backend/app/services/query_parser.py`'s keyword-spotting stand-in:
+
+```
+System:
+You are a query parser for a fashion image search system. Given a natural
+language search query, extract structured information as JSON matching
+this schema exactly:
+
+{
+  "garments": [{"slot": "upper|lower|outerwear|footwear|accessory", "type": string, "color": string|null}],
+  "scene": "office|street|park|home|other" | null,
+  "style": "formal|casual|athleisure|business|other" | null
+}
+
+Only include a garment, scene, or style if the query supports it — do not
+guess. Return valid JSON only, no other text.
+
+Few-shot:
+
+Query: "A bright yellow raincoat"
+JSON: {"garments": [{"slot": "outerwear", "type": "raincoat", "color": "yellow"}], "scene": null, "style": null}
+
+Query: "Professional business attire inside a modern office"
+JSON: {"garments": [], "scene": "office", "style": "business"}
+
+Query: "Someone wearing a blue shirt sitting on a park bench"
+JSON: {"garments": [{"slot": "upper", "type": "shirt", "color": "blue"}], "scene": "park", "style": null}
+
+Query: "Casual weekend outfit for a city walk"
+JSON: {"garments": [], "scene": "street", "style": "casual"}
+
+Query: "A red tie and a white shirt in a formal setting"
+JSON: {"garments": [{"slot": "accessory", "type": "tie", "color": "red"}, {"slot": "upper", "type": "shirt", "color": "white"}], "scene": null, "style": "formal"}
+```
+
+The five few-shot examples are exactly the five eval queries from §6 — deliberately, so the parser's few-shot coverage and the grading queries are the same set. Output maps 1:1 onto `ParsedQuery`/`Garment` in `backend/app/schema.py`, so swapping this in is a body-only change to `query_parser.parse_query`; the API and retriever are untouched.
 
 ### 4.4 Query-volume scaling (distinct from dataset-size scaling)
 - ANN + metadata filtering scales via standard sharding/read-replicas behind a load balancer — Qdrant and Chroma both support this natively, no custom indexing code needed.
@@ -142,8 +181,8 @@ Fashionpedia alone is sufficient to hit the 500–1000 image / 3-axis requiremen
 
 - [x] **Pick the architecture** from §2 — **Option D chosen** (structured VLM attribute extraction → symbolic schema + dense fallback).
 - [x] Which serving mode for the VLM — **hosted API chosen** (Gemini Flash / GPT-4o-mini) over self-hosting, for least setup friction (see §4.2).
-- [ ] Exact few-shot prompt/schema for the LLM query parser.
-- [ ] Qdrant vs Chroma — pick based on ease of hybrid filter+ANN setup in whichever client library you're more comfortable with.
+- [x] Exact few-shot prompt/schema for the LLM query parser — **drafted in §4.3.1**, ready to drop into `query_parser.py`.
+- [x] Qdrant vs Chroma — **Chroma chosen** (embedded, no server to run), see §4.2.
 - [ ] Repo structure (Part A: `indexer/`, Part B: `retriever/`).
 - [ ] Scoring weights (α in the weighted hybrid) — tune against the 5 eval queries directly, that's your actual eval loop.
 - [ ] Decide how much of DeepFashion2/iMaterialist/Polyvore to actually pull in vs. just cite as "considered" in the approaches section.
