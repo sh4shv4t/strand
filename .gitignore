@@ -12,6 +12,7 @@ venv/
 *.egg-info/
 .pytest_cache/
 backend/app/data/fashionpedia_images/
+backend/app/data/image_vector_index/
 
 # Env
 .env

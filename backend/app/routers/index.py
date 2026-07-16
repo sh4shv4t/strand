@@ -1,18 +1,23 @@
 from fastapi import APIRouter, HTTPException
 
-from app.services.indexer import index_image
+from app.services.indexer import IndexingDependenciesMissing, index_image
 
 router = APIRouter(prefix="/api", tags=["index"])
 
 
 @router.post("/index")
-def index(image_path: str) -> None:
-    """Stub endpoint for the offline indexing loop (Working_notes.md Section 4.1).
-
-    Not implemented in this scaffold -- always returns 501. Exists so the
-    API surface for the eventual real indexing pipeline is visible now.
+def index(image_path: str) -> dict[str, object]:
+    """Part A: The Indexer, exposed over the API. Runs real feature
+    extraction (services/indexer.py, CLIP-based, no VLM key needed) and
+    persists the embedding. Returns 503 if the heavy optional
+    dependencies (torch, open_clip) are not installed in this
+    deployment, 404 if image_path does not exist.
     """
     try:
-        index_image(image_path)
-    except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc)) from exc
+        embedding = index_image(image_path)
+    except IndexingDependenciesMissing as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return {"status": "indexed", "embedding_dim": len(embedding)}

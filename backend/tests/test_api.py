@@ -32,9 +32,31 @@ def test_catalog_endpoint_returns_full_catalog(client):
     assert all("id" in record and "caption" in record for record in body)
 
 
-def test_index_endpoint_is_not_implemented(client):
+def test_index_endpoint_success(client, monkeypatch):
+    monkeypatch.setattr("app.routers.index.index_image", lambda path: [0.1, 0.2, 0.3])
     response = client.post("/api/index", params={"image_path": "foo.jpg"})
-    assert response.status_code == 501
+    assert response.status_code == 200
+    assert response.json() == {"status": "indexed", "embedding_dim": 3}
+
+
+def test_index_endpoint_reports_missing_dependencies(client, monkeypatch):
+    from app.services.indexer import IndexingDependenciesMissing
+
+    def raise_missing(path):
+        raise IndexingDependenciesMissing("deps not installed")
+
+    monkeypatch.setattr("app.routers.index.index_image", raise_missing)
+    response = client.post("/api/index", params={"image_path": "foo.jpg"})
+    assert response.status_code == 503
+
+
+def test_index_endpoint_reports_missing_file(client, monkeypatch):
+    def raise_not_found(path):
+        raise FileNotFoundError(f"no such file: {path}")
+
+    monkeypatch.setattr("app.routers.index.index_image", raise_not_found)
+    response = client.post("/api/index", params={"image_path": "does-not-exist.jpg"})
+    assert response.status_code == 404
 
 
 def test_unknown_route_returns_404(client):
