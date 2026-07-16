@@ -49,8 +49,8 @@ class ScoredResult(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
-    top_k: int = 5
-    alpha: float = 0.6
+    top_k: int = Field(default=5, ge=1, le=50)
+    alpha: float = Field(default=0.6, ge=0.0, le=1.0)
 
 
 class QueryResponse(BaseModel):

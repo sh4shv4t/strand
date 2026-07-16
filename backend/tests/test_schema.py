@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from app.schema import Garment, ImageRecord, ParsedQuery, QueryRequest
 
 
@@ -25,3 +28,13 @@ def test_query_request_defaults():
     request = QueryRequest(query="a query")
     assert request.top_k == 5
     assert request.alpha == 0.6
+
+
+def test_query_request_rejects_excessive_top_k():
+    with pytest.raises(ValidationError):
+        QueryRequest(query="a query", top_k=999999)
+
+
+def test_query_request_rejects_out_of_range_alpha():
+    with pytest.raises(ValidationError):
+        QueryRequest(query="a query", alpha=1.5)
