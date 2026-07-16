@@ -18,6 +18,9 @@ backend/app/data/image_vector_index/
 .env
 .env.local
 
+# Generated submission PDF (regenerate from docs/submission.html)
+docs/*.pdf
+
 # Editors / OS
 .vscode/
 .idea/
