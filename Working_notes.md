@@ -73,7 +73,7 @@ This directly answers "how will you serve the models" — worth a short paragrap
 
 | Model | Role | Serving mode | Notes |
 |---|---|---|---|
-| VLM (attribute extractor) | Index-time, batch | Either self-hosted small VLM (Florence-2-large 0.77B, Qwen2-VL-2B quantized — both fit comfortably in 4GB VRAM) **or** a cheap hosted API (Gemini Flash / GPT-4o-mini) called in a batch loop | One-time or delta batch job over 500–1000 images, no real-time requirement, so either choice is fine — self-hosting is free but slower to set up; API is faster to prototype and cheap at this volume |
+| VLM (attribute extractor) | Index-time, batch | ✅ **Chosen: hosted API** (Gemini Flash / GPT-4o-mini) called in a batch loop | One-time or delta batch job over 500–1000 images, no real-time requirement — chosen over self-hosting (Florence-2-large / Qwen2-VL-2B) purely for least setup friction: no checkpoint download, no local GPU/quantization plumbing, just an API key and a batch loop. Self-hosting stays a valid future-work swap if API cost/rate-limits become a problem at larger scale |
 | Fashion dense encoder (Marqo-FashionCLIP/SigLIP) | Index-time (image) + query-time (text) | Self-hosted, local inference | ~150–400M params, trivial on a 4GB GPU or even CPU; load once, keep resident in a small FastAPI service or just in-process in your retriever script |
 | LLM query parser | Query-time only | API call (no local hosting needed) | Runtime latency matters here since it's per-query, not per-image — a small/fast model (e.g. a mini-tier model) with a few-shot prompt is enough; this is the actual bottleneck at high query volume, not the vector search |
 | Vector DB (Qdrant/Chroma) | Both | Local process or lightweight server, CPU-only | No GPU needed; supports ANN + payload/metadata filter in one call |
@@ -141,7 +141,7 @@ Fashionpedia alone is sufficient to hit the 500–1000 image / 3-axis requiremen
 ## 9. Open decisions / TODO
 
 - [x] **Pick the architecture** from §2 — **Option D chosen** (structured VLM attribute extraction → symbolic schema + dense fallback).
-- [ ] Which serving mode for the VLM — self-hosted local vs. API (see §4.2 tradeoffs).
+- [x] Which serving mode for the VLM — **hosted API chosen** (Gemini Flash / GPT-4o-mini) over self-hosting, for least setup friction (see §4.2).
 - [ ] Exact few-shot prompt/schema for the LLM query parser.
 - [ ] Qdrant vs Chroma — pick based on ease of hybrid filter+ANN setup in whichever client library you're more comfortable with.
 - [ ] Repo structure (Part A: `indexer/`, Part B: `retriever/`).
