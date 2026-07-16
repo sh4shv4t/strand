@@ -1,6 +1,6 @@
 # Glance ML Internship Assignment — Working Notes (v2)
 
-Status: **architecture CHOSEN — Option D** (structured VLM attribute extraction → symbolic schema + dense fallback; see §2). This version lays out the full option space, a real workflow (indexing + serving + querying), and an expanded dataset list, and locks in D as the path forward; §2, §9, and §10 reflect that decision. The remaining open decisions (VLM serving mode, query-parser prompt, vector DB choice, etc.) are tracked in §9.
+Status: **all design decisions locked in** — Option D architecture (§2), hosted-API VLM serving, Chroma, the query-parser prompt, repo structure, and dataset scope (all §9). The only thing left open is the weighted-hybrid α, which needs real data/VLM output in the loop to tune against rather than a design call to make ahead of time. Next step is real implementation: replacing the mocked catalog/parser with a real Fashionpedia sample, a real VLM call, and Chroma.
 
 ---
 
@@ -183,9 +183,9 @@ Fashionpedia alone is sufficient to hit the 500–1000 image / 3-axis requiremen
 - [x] Which serving mode for the VLM — **hosted API chosen** (Gemini Flash / GPT-4o-mini) over self-hosting, for least setup friction (see §4.2).
 - [x] Exact few-shot prompt/schema for the LLM query parser — **drafted in §4.3.1**, ready to drop into `query_parser.py`.
 - [x] Qdrant vs Chroma — **Chroma chosen** (embedded, no server to run), see §4.2.
-- [ ] Repo structure (Part A: `indexer/`, Part B: `retriever/`).
-- [ ] Scoring weights (α in the weighted hybrid) — tune against the 5 eval queries directly, that's your actual eval loop.
-- [ ] Decide how much of DeepFashion2/iMaterialist/Polyvore to actually pull in vs. just cite as "considered" in the approaches section.
+- [x] Repo structure (Part A: `indexer/`, Part B: `retriever/`) — **reconciled with what's built**: one FastAPI app (`backend/app/`) rather than two top-level dirs, with the Part A/Part B split kept at the module level instead — `services/indexer.py` (Part A, offline) sits next to `services/retriever.py` + `query_parser.py` (Part B, online), sharing `schema.py` so both sides speak the same JSON contract. No renaming needed; a two-top-level-dir split would only add friction for no behavioral difference at this scale.
+- [ ] Scoring weights (α in the weighted hybrid) — tune against the 5 eval queries directly, that's your actual eval loop. Left open deliberately: needs a real dataset/VLM in the loop to tune against, not a design call to make ahead of time.
+- [x] Decide how much of DeepFashion2/iMaterialist/Polyvore to actually pull in vs. just cite as "considered" — **Fashionpedia only, others cite-only**. §5's own verdict already says Fashionpedia alone is sufficient for the 500–1000 image / 3-axis requirement; pulling in extra datasets buys "generalizes beyond one label set" evidence the assignment doesn't grade for, at the cost of real setup time (three more download/licensing/format checks). Matches every other decision so far: least friction that still satisfies the assignment as written.
 
 ---
 
