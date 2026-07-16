@@ -1,0 +1,162 @@
+# Glance ML Internship Assignment — Working Notes (v2)
+
+Status: **architecture NOT locked in.** This version lays out the full option space, a real workflow (indexing + serving + querying), and an expanded dataset list. Pick the final approach after you've weighed the tradeoffs below — I've kept my earlier "CHOSEN" framing out on purpose.
+
+---
+
+## 1. Problem nuances (unchanged, still true)
+
+- CLIP's dual-encoder trains on whole-image/whole-caption contrastive pairs → no attribute-object binding → "bag of words" failure mode (the ARO benchmark line of work documents this). This is exactly what breaks eval query 5 ("red tie, white shirt") — color-swapped images score similarly under vanilla CLIP.
+- Fine-tuned fashion embedding models close the *vocabulary* gap but not the *binding* gap. Marqo-FashionCLIP and Marqo-FashionSigLIP (fine-tuned from SigLIP/CLIP backbones using Generalised Contrastive Learning) report large recall gains over generic CLIP and the older FashionCLIP2.0 baseline on fashion retrieval benchmarks — Marqo's own reported figures put FashionSigLIP's improvement around the +50% range in MRR/recall over FashionCLIP2.0. But it's still a single dense vector per image, so compositional confusion (query 5, and to a lesser extent query 3/4) doesn't go away — it's still one pooled embedding trying to represent multiple garments + scene + style at once.
+- "Where" (location/scene) and "vibe" (style) are scene-level signals, distinct from garment attributes. Cramming everything into one embedding just recreates bag-of-words at a higher level of abstraction. These are naturally three separable axes (garment, scene, style) and the eval queries test each axis individually and in combination — worth treating them as separate, independently matchable fields rather than one blob.
+- Assignment explicitly deprioritizes indexing engineering — "pick the easiest vector DB" — so the grading weight is on retrieval *logic*, not infra plumbing.
+
+---
+
+## 2. Candidate architectures (tradeoff table — nothing chosen yet)
+
+### Option A — Vanilla CLIP / SigLIP whole-image embedding
+Baseline only. Given as the anti-pattern in the prompt itself. Fails query 5 by construction, and does poorly on query 3/4 (contextual/style inference) since a single vector under-weights secondary attributes. Zero eng cost, zero fashion awareness. Use only as your reported baseline number, not your submission.
+
+### Option B — Fine-tuned fashion dense embedding only (Marqo-FashionCLIP/SigLIP)
+Swap the backbone for a fashion-tuned one. Better recall on garment vocabulary and color naming, same binding failure. Low eng cost (drop-in HF model). Still a single vector — scene and style get entangled with garment attributes in the same embedding space. Reasonable *fallback/reranking* component, weak as a sole system.
+
+### Option C — Region/detection-based compositional retrieval
+Detect each garment (bbox) with a fashion object detector (DeepFashion2-trained, or a general detector like YOLO fine-tuned on Fashionpedia's segmentation masks), embed each region + classify its color independently, then match query sub-phrases to regions. Solves compositionality *by construction* — this is structurally what Pinterest's Shop-the-Look and Myntra's My Stylist actually do in production (both name a dedicated detection step as stage one of their pipeline, before any embedding). Highest fidelity on query 5, but needs a trained/fine-tuned detector — higher eng cost, and the assignment explicitly asks you to *not* over-invest in engineering-heavy indexing infrastructure. Worth citing as the "correct at scale" answer in your future-work section even if you don't build it fully.
+
+### Option D — Structured VLM attribute extraction → symbolic schema + dense fallback
+A VLM (or small fine-tuned model) emits a fixed JSON schema per image at index time:
+```
+{garments: [{slot: upper/lower/outerwear/footwear, type, color}],
+ scene: office/street/park/home/other,
+ style: formal/casual/athleisure/...,
+ notable: [free text]}
+```
+Query time: an LLM parses the NL query into the same schema; retrieval = symbolic filter (exact/fuzzy match on schema fields) intersected or blended with dense cosine similarity on a flattened caption (for recall on free-text/style nuance the schema doesn't capture). Solves compositionality via explicit slot binding rather than spatial detection — cheaper than Option C, still zero-shot (open-vocabulary VLM + LLM parser, no closed label set to retrain). A real, recent precedent for the "small VLM fine-tuned to emit fashion JSON" pattern: *Fashion Florence* (arXiv, May 2026) fine-tunes Florence-2 (0.77B params) with LoRA on iMaterialist Fashion labels to emit compact JSON (category/color/material/style/occasion), and reports it beating GPT-4o-mini and Gemini 2.5 Flash on category and style-tag accuracy for this exact structured-extraction task, while running cheaply on a single GPU. That's a solid citation for "this pattern is practical, not speculative."
+
+### Option E — Hybrid: coarse detection + structured attributes (no full re-ID)
+A middle ground between C and D: instead of a full fashion object detector, use lightweight crop heuristics (simple upper/lower/outerwear region heuristics from pose estimation, or just quadrant-based crops since most fashion photos are single-person full-body shots) to get 2–3 rough garment crops, then run the VLM/attribute-extraction step *per crop* instead of on the whole image. Gets you most of Option C's binding accuracy without training a real detector — pose estimation models (e.g. MediaPipe Pose, MMPose) are pretrained and off-the-shelf. Medium eng cost, good compositionality, no detector fine-tuning needed. This is probably the best "shows ML judgment without over-engineering" answer for a take-home.
+
+**My honest read:** D is the safest, fastest-to-build, cleanly-fashion-aware answer and matches the assignment's "don't over-invest in indexing engineering" instruction almost exactly. E is a stronger answer if you have 1–2 extra days and want to visibly beat pure-CLIP on the compositional query without building a full detector. C is what you cite as "what production does at scale" in the future-work section. Your call — happy to help scaffold whichever you pick.
+
+---
+
+## 3. Hybrid pipeline design space (mix and match)
+
+You don't have to pick a single point on the table above — the retrieval *scoring* step can blend signals regardless of which extraction method you use upstream:
+
+- **Symbolic-only:** exact filter on schema fields. Fast, precise, brittle to query phrasing / missing fields.
+- **Dense-only:** cosine similarity on flattened caption or CLIP embedding. Robust to phrasing, weak on compositionality.
+- **Weighted hybrid (what the earlier notes proposed):** `score = α·symbolic_match + (1-α)·dense_cosine`, tune α against the 5 eval queries. Simple, interpretable, easy to defend in a write-up.
+- **Filter-then-rerank (Pinterest's actual pattern):** cheap ANN/ hamming-distance recall pass first to get a shortlist, then a heavier relevance signal reranks only that shortlist. Structurally identical to the weighted hybrid but staged instead of blended — worth mentioning as the production-grade version of the same idea, with "replace fixed weighting with a learned reranker" as a natural future-work line.
+- **Cascade/fallback:** try symbolic filter first; if it returns too few results (schema too strict, or the query parser has low confidence on a field), fall back to pure dense search. Handles queries that don't map cleanly onto your fixed schema.
+
+Recommend building the weighted hybrid first (easiest to implement and to explain in the write-up), then mentioning the cascade and reranker versions as future-work extensions — that satisfies both "working system" and "shows you know the more sophisticated version" grading angles.
+
+---
+
+## 4. Full workflow — indexing, serving, and querying end to end
+
+### 4.1 Offline indexing loop (runs once per image, not per query)
+1. **Ingest**: pull 500–1000 sampled images from chosen dataset(s) (see §5).
+2. **Attribute/region extraction** (method depends on architecture choice in §2):
+   - Option D: single VLM call per image → JSON schema.
+   - Option E: pose/crop step → per-crop VLM call → merge into one JSON.
+   - Option C: detector inference → per-bbox embed + color classify.
+3. **Dense embedding pass**: encode a flattened caption (built from the JSON, e.g. "casual blue hoodie and grey joggers, street setting") through a fashion-tuned encoder (Marqo-FashionCLIP/SigLIP) for the reranking/fallback signal. Also keep the raw image embedding if you want direct CLIP-similarity as a secondary signal.
+4. **Scene/style tagging**: if not covered by your dataset's own labels, zero-shot classify scene (office/street/park/home) and style (formal/casual/athleisure) with CLIP or the same VLM, since Fashionpedia doesn't natively label environment.
+5. **Write to store**: JSON schema as payload/metadata + dense vector, in one record per image, keyed by image ID.
+6. **Delta processing going forward**: only re-run steps 2–5 on new/changed images, not the whole catalog — this is what makes the "does it work at 1M images" scalability answer credible. All heavy model inference lives here, offline, where latency doesn't matter.
+
+### 4.2 Model serving — how each model actually gets called
+This directly answers "how will you serve the models" — worth a short paragraph in your report.
+
+| Model | Role | Serving mode | Notes |
+|---|---|---|---|
+| VLM (attribute extractor) | Index-time, batch | Either self-hosted small VLM (Florence-2-large 0.77B, Qwen2-VL-2B quantized — both fit comfortably in 4GB VRAM) **or** a cheap hosted API (Gemini Flash / GPT-4o-mini) called in a batch loop | One-time or delta batch job over 500–1000 images, no real-time requirement, so either choice is fine — self-hosting is free but slower to set up; API is faster to prototype and cheap at this volume |
+| Fashion dense encoder (Marqo-FashionCLIP/SigLIP) | Index-time (image) + query-time (text) | Self-hosted, local inference | ~150–400M params, trivial on a 4GB GPU or even CPU; load once, keep resident in a small FastAPI service or just in-process in your retriever script |
+| LLM query parser | Query-time only | API call (no local hosting needed) | Runtime latency matters here since it's per-query, not per-image — a small/fast model (e.g. a mini-tier model) with a few-shot prompt is enough; this is the actual bottleneck at high query volume, not the vector search |
+| Vector DB (Qdrant/Chroma) | Both | Local process or lightweight server, CPU-only | No GPU needed; supports ANN + payload/metadata filter in one call |
+
+Your dev machine (RTX 3050, 4GB VRAM + i7) is fine for all of this — the only thing that would actually stress it is *fine-tuning* a VLM, which none of these options require (Fashion Florence-style fine-tuning is a nice-to-mention future-work stretch goal, not a requirement here).
+
+### 4.3 Online query loop (runs per user query, must be fast)
+1. User submits NL query, e.g. "a red tie and a white shirt in a formal setting."
+2. **LLM parser** (few-shot prompted) converts it into the same JSON schema used at index time — e.g. `{garments: [{slot: upper, type: shirt, color: white}, {slot: accessory, type: tie, color: red}], style: formal}`.
+3. **Retrieval**: run your chosen scoring strategy (weighted hybrid / cascade / rerank) against the precomputed store — symbolic filter on schema fields intersected/blended with dense cosine similarity on the flattened caption.
+4. **Return top-k** image IDs + scores.
+5. Never call the VLM or detector at query time — only the lightweight parser + ANN lookup touch the query path. This offline/online split is the direct answer to the scalability grading criterion: it's irrelevant at 500 images and is the difference between working and not working at 1M.
+
+### 4.4 Query-volume scaling (distinct from dataset-size scaling)
+- ANN + metadata filtering scales via standard sharding/read-replicas behind a load balancer — Qdrant and Chroma both support this natively, no custom indexing code needed.
+- The real bottleneck at high QPS is the **LLM query parser** (per-query network call). Mitigations, roughly in order of effort: (1) cache parsed JSON for repeated/near-duplicate queries, (2) once you've logged enough query→JSON pairs, distill into a small fine-tuned local classifier/NER model and drop the API dependency entirely, (3) add a Redis-style cache layer in front of the whole pipeline for popular queries.
+
+---
+
+## 5. Dataset plan (expanded)
+
+### Primary
+- **Fashionpedia** (via Hugging Face, `detection-datasets/fashionpedia`): 45,623 train + 1,158 val, ~3.5GB, CC-BY-4.0. Real daily-life/street-style/celebrity-event photos (not studio shots) — covers clothing type + color natively via 294 fine-grained attribute labels + segmentation masks. No scraping needed. Environment axis isn't natively labeled — tag it yourself via zero-shot CLIP classification against {office, street, park, home}, since the photos already vary in setting.
+
+### Worth adding alongside it (new — not in v1 notes)
+- **DeepFashion2** (491K images): larger, has consumer-photo/shop-photo pairs and richer bounding-box + landmark annotations than Fashionpedia. Overkill to use in full, but a small sample (a few hundred images) is a good *additional* environment-diversity source, and its bbox annotations are useful if you go with Option C/E (detection-based).
+- **iMaterialist Fashion** (228 fine-grained attribute labels across category/color/material/style/pattern/sleeve/neckline/gender): good complementary attribute vocabulary — this is actually the dataset Fashion Florence itself fine-tunes on, so if you want a similar structured-JSON attribute schema, iMaterialist's label taxonomy is a solid template to borrow from directly.
+- **Polyvore Outfits dataset**: curated outfit sets (multiple garments styled together), useful if you want extra "vibe/style" signal since it's built around styling/outfit coherence rather than single-item catalog shots — good for style-axis diversity, thinner on garment-level bounding boxes.
+- **Kaggle "Fashion Product Images" (Myntra-sourced, ~44K)**: good clothing/color labels but studio/plain-background only — no environment diversity. Useful as a supplemental *catalog-style* negative-diversity source (to make sure your system doesn't only work on street photos) but not a substitute for Fashionpedia.
+- **Fashion200K**: shorter product-description style captions, useful mainly as extra text-to-image training/eval signal if you want more text variety for tuning your query parser's few-shot examples.
+
+### Verdict
+Fashionpedia alone is sufficient to hit the 500–1000 image / 3-axis requirement on its own. Adding a small DeepFashion2 or iMaterialist sample mainly strengthens your "zero-shot / generalizes beyond one dataset's label set" story, which maps directly onto the zero-shot grading criterion — worth doing if you have time, not required.
+
+---
+
+## 6. Mapping the 5 eval queries to what each architecture needs to get right
+
+1. **"A bright yellow raincoat"** — single attribute + single garment. All options handle this; it's the sanity-check query.
+2. **"Professional business attire inside a modern office"** — needs the scene/style axes decoupled from garment detail. Tests whether your schema treats scene/style as first-class fields rather than folding them into a single caption.
+3. **"Someone wearing a blue shirt sitting on a park bench"** — garment + scene combo, mild compositionality (one garment, one scene — lower risk than query 5).
+4. **"Casual weekend outfit for a city walk"** — style inference query, no explicit garment colors named. Tests whether your style tagging (zero-shot classified or VLM-inferred) is doing real work, since there's nothing literal to pattern-match against.
+5. **"A red tie and a white shirt in a formal setting"** — the compositional stress test. This is the one vanilla CLIP fails and the one that justifies whichever non-baseline architecture you pick. Worth explicitly showing a before/after (CLIP baseline vs. your system) on this query in the report — it's the single most persuasive result you can show.
+
+---
+
+## 7. Industry precedent (verified, safe to cite in the report)
+
+- **Glance's own engineering blog** (with Google Cloud, published ~July 2025; follow-up detail post on Glance's engineering blog): describes using Gemini models to extract structured entities/relationships from raw content into a Neo4j knowledge graph, rather than relying on pooled dense embeddings alone — the same "structured extraction over raw embedding" pattern proposed here, applied to news instead of fashion, at a reported scale of 50,000+ daily articles. Good opening line for your "why this approach" section since it's literally Glance's own precedent.
+- **Pinterest visual search / Shop-the-Look**: runs object detection on the scene photo to isolate individual products before matching — the production validation for the region/detection-based approach (Option C above). Their hybrid search is a retrieve-then-rerank pipeline (cheap ANN recall first, heavier relevance model reranks the shortlist) — structurally the same as the weighted-hybrid design in §3, just with a learned reranker instead of a fixed weighted sum. Pinterest also historically ran several specialized embeddings per product type before unifying into one multi-task embedding for maintainability — a good analogy for why one shared JSON schema (rather than per-query-type logic) is the right call.
+- **Myntra's "My Stylist"**: Myntra's own blog names 'Fashion Object Detection' as one of three explicit pipeline components (alongside 'Image Search' and 'Outfit Recommendations'), built for high query volume. Confirms detect-then-embed is treated as production infrastructure, not an optional add-on, at a real e-commerce scale (~450K styles).
+- Taken together: three independent companies converge on the same underlying principle — extract structured signal once, offline, and keep the online query path cheap. That's a strong framing line for your report's introduction to the chosen-approach section.
+
+---
+
+## 8. Future work section (for the report)
+
+- **Location/weather extension**: add as another symbolic-filterable schema field (a scene classifier extension, or EXIF/geo metadata if your dataset carries it) — no architecture change needed, just schema growth.
+- **Precision improvement**: hard-negative mining on attribute-swapped captions (NegCLIP/ARO-style) to fine-tune the dense reranker specifically on compositional confusions; add parser-confidence scoring so low-confidence parses fall back to pure dense search instead of an overconfident wrong filter.
+- **Reranker upgrade**: replace the fixed weighted-sum score with a learned reranker (small cross-encoder or LTR model) once you have query→relevance feedback data — mirrors Pinterest's retrieve-then-rerank pattern directly.
+- **Query parser distillation**: once enough query→JSON pairs are logged, distill the LLM parser into a small local classifier/NER model to cut API latency and cost at scale — mirrors Pinterest's move from many specialized models to one unified, cheaper-to-serve model.
+
+---
+
+## 9. Open decisions / TODO
+
+- [ ] **Pick the architecture** from §2 (D is fastest to build and cleanest fit for the assignment's constraints; E is the stronger differentiator if you have extra time; C is cite-only unless you want a bigger lift).
+- [ ] Which serving mode for the VLM — self-hosted local vs. API (see §4.2 tradeoffs).
+- [ ] Exact few-shot prompt/schema for the LLM query parser.
+- [ ] Qdrant vs Chroma — pick based on ease of hybrid filter+ANN setup in whichever client library you're more comfortable with.
+- [ ] Repo structure (Part A: `indexer/`, Part B: `retriever/`).
+- [ ] Scoring weights (α in the weighted hybrid) — tune against the 5 eval queries directly, that's your actual eval loop.
+- [ ] Decide how much of DeepFashion2/iMaterialist/Polyvore to actually pull in vs. just cite as "considered" in the approaches section.
+
+---
+
+## 10. Scaffold status (this repo)
+
+The current repo implements a **mocked stand-in** for the Option D pipeline described above, so the API contract and UI are usable before any real model/dataset integration:
+
+- `backend/app/services/query_parser.py` — rule-based keyword-spotting parser standing in for the LLM query parser in §4.3. Same output schema, swap the implementation later without touching the API surface.
+- `backend/app/data/sample_catalog.json` — ~10 hand-written mock image records in the exact JSON schema from §2 Option D, standing in for the indexed Fashionpedia sample.
+- `backend/app/services/retriever.py` — implements the weighted hybrid from §3 (`score = α·symbolic_match + (1-α)·dense_overlap`) against the mock catalog.
+- `backend/app/routers/index.py` — `/api/index` is a stub that documents where the real offline indexing loop (§4.1) would plug in; it does not run a VLM or write to a vector DB yet.
+
+None of the open decisions in §9 are resolved by this scaffold — it exists to make the retrieval *logic* (weighted hybrid, schema shape, query→result flow) testable end-to-end ahead of picking a final architecture and real dataset/model integration.
