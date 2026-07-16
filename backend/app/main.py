@@ -1,3 +1,4 @@
+import os
 import time
 
 from fastapi import FastAPI, HTTPException, Request
@@ -15,9 +16,11 @@ app = FastAPI(
     version="0.1.0",
 )
 
+cors_origins = os.environ.get("STRAND_CORS_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
