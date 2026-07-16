@@ -20,12 +20,19 @@ This repo currently ships a scaffold of that pipeline with mocked data: a hand-w
 ```
 strand/
 ├── Working_notes.md      # architecture options, dataset plan, tradeoffs, open decisions
+├── .github/workflows/ci.yml   # backend pytest + frontend build/lint on push/PR
 ├── backend/
+│   ├── scripts/
+│   │   └── pull_fashionpedia_sample.py   # regenerates real_catalog_sample.json
+│   ├── tests/                  # pytest suite, see Testing below
 │   └── app/
 │       ├── schema.py          # Pydantic models for the garment/scene/style JSON schema
-│       ├── data/               # mock indexed catalog (stand-in for a real dataset index)
+│       ├── observability.py   # structured logging + OpenTelemetry (console exporter)
+│       ├── data/               # mock decoy-pair records + a real Fashionpedia sample
 │       ├── services/
 │       │   ├── query_parser.py    # rule-based parser (stand-in for an LLM query parser)
+│       │   ├── catalog.py         # loads/caches the combined catalog
+│       │   ├── vector_store.py    # dense similarity via a local Chroma collection
 │       │   ├── retriever.py       # weighted-hybrid scoring (symbolic + dense)
 │       │   └── indexer.py         # stub documenting the real offline indexing pipeline
 │       └── routers/            # /api/query, /api/catalog, /api/index
@@ -58,6 +65,16 @@ npm run dev
 
 The frontend dev server proxies `/api/*` to `http://localhost:8000`. Open the printed local URL (default `http://localhost:5173`).
 
+## Testing
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest -v
+```
+
+Tests run with `STRAND_DISABLE_EMBEDDINGS=1` (set in `tests/conftest.py`) so they exercise the deterministic word-overlap fallback instead of downloading the real embedding model — fast and network-independent. `tests/test_eval_accuracy.py` runs the 5 canonical eval queries from `Working_notes.md` end to end and checks retrieval accuracy, not just unit-level correctness. CI (`.github/workflows/ci.yml`) runs this suite plus a frontend build/lint on every push and PR.
+
 ## API
 
 | Method | Path | Description |
@@ -68,10 +85,10 @@ The frontend dev server proxies `/api/*` to `http://localhost:8000`. Open the pr
 
 ## Status and limitations
 
-This is an initial scaffold, not a finished system:
+Partway from mocked to real, not a finished system:
 
-- The catalog is 12 hand-written mock records, not a real indexed dataset.
-- The query parser is keyword-spotting, not an LLM.
-- No embedding model, VLM, or vector database is integrated yet.
+- The catalog combines 12 hand-written mock records with 40 real Fashionpedia records; garment detection on the real records uses the dataset's own labels, but `color`, `scene`, and `style` are honestly `null` there, not guessed.
+- The query parser is keyword-spotting, not an LLM — a prompt to replace it is already drafted in `Working_notes.md` §4.3.1.
+- Dense retrieval uses real embeddings (Chroma, local, no API key); symbolic retrieval and the weighted-hybrid blend are real. No VLM is integrated yet, so the fields it would fill in stay empty.
 
-See `Working_notes.md` sections 9 and 10 for the full list of open decisions and what a production implementation would still need.
+See `Working_notes.md` sections 9–11 for the full list of decisions made, what's still open, and the testing/CI/observability setup.
