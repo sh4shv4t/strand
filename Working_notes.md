@@ -191,11 +191,12 @@ Fashionpedia alone is sufficient to hit the 500–1000 image / 3-axis requiremen
 
 ## 10. Scaffold status (this repo)
 
-The current repo implements a **mocked stand-in** for the chosen Option D pipeline, so the API contract and UI are usable before any real model/dataset integration:
+The repo is partway from mocked to real: garment detection and dense retrieval now run on real data/models, but attribute extraction (color, scene, style) is still mocked pending a VLM API key.
 
 - `backend/app/services/query_parser.py` — rule-based keyword-spotting parser standing in for the LLM query parser in §4.3. Same output schema, swap the implementation later without touching the API surface.
-- `backend/app/data/sample_catalog.json` — ~10 hand-written mock image records in the exact JSON schema from §2 Option D, standing in for the indexed Fashionpedia sample.
-- `backend/app/services/retriever.py` — implements the weighted hybrid from §3 (`score = α·symbolic_match + (1-α)·dense_overlap`) against the mock catalog.
-- `backend/app/routers/index.py` — `/api/index` is a stub that documents where the real offline indexing loop (§4.1) would plug in; it does not run a VLM or write to a vector DB yet.
+- `backend/app/data/sample_catalog.json` — 12 hand-written mock records, kept specifically for the color-swapped decoy pair (img_005/img_006) that demonstrates compositional binding.
+- `backend/app/data/real_catalog_sample.json` — 40 real records pulled from Fashionpedia's validation split via `backend/scripts/pull_fashionpedia_sample.py`, using the dataset's own ground-truth bbox categories mapped onto our slot/type taxonomy. This particular Fashionpedia mirror (`detection-datasets/fashionpedia`) only exposes category + bbox, not the original paper's 294 fine-grained attributes — so these records have real garments/slots but `color`, `scene`, and `style` are honestly `null` rather than guessed; that's exactly the piece the still-mocked VLM step (§4.2) would fill in.
+- `backend/app/services/retriever.py` — symbolic scoring is unchanged; the dense half now queries a local Chroma collection (default embedding function, no API key) over both JSON files combined, for real cosine similarity instead of word overlap. Falls back to word overlap if the embedding model can't be loaded (e.g. no network yet to cache its weights), so the app degrades instead of failing to start.
+- `backend/app/routers/index.py` — `/api/index` is still a stub; it documents where the real VLM-based offline indexing loop (§4.1) would plug in for datasets that don't ship ground-truth attributes the way Fashionpedia's category labels do.
 
 The architecture decision is resolved (§9); the remaining open decisions (VLM serving mode, query-parser prompt, vector DB choice, dataset pull scope) are not — this scaffold exists to make the retrieval *logic* (weighted hybrid, schema shape, query→result flow) testable end-to-end ahead of that real dataset/model integration.
