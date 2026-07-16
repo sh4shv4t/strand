@@ -1,5 +1,8 @@
 """One-off script: pull a small real sample from Fashionpedia and write it
-to app/data/real_catalog_sample.json in the Strand schema.
+to app/data/real_catalog_sample.json in the Strand schema. Also persists
+the actual JPEGs to app/data/fashionpedia_images/ (gitignored -- rerun this
+script to regenerate them; they're not committed) for the Tier 2 real-image
+CLIP baseline in scripts/eval_clip_baseline.py.
 
 Not part of the running app -- run manually to (re)generate the sample:
 
@@ -15,6 +18,9 @@ stay null too (Working_notes.md Section 4.1 step 4: environment/style
 tagging is a separate zero-shot/VLM step, deliberately deferred until a
 VLM API key or local model is wired up). This script only replaces the
 mocked *garment detection* half of indexing with real data.
+
+Streaming iteration order is deterministic (no shuffling), so rerunning
+this reproduces the same 40 image_ids as the committed real_catalog_sample.json.
 """
 
 import json
@@ -23,6 +29,7 @@ from pathlib import Path
 from datasets import load_dataset
 
 TARGET_COUNT = 40
+IMAGES_DIR = Path(__file__).resolve().parent.parent / "app" / "data" / "fashionpedia_images"
 
 # Fashionpedia category name -> (slot, our type name). Categories not listed
 # here are garment *parts*/decorative details (collar, sleeve, zipper, bead,
@@ -87,18 +94,22 @@ def main() -> None:
     dataset = load_dataset("detection-datasets/fashionpedia", split="val", streaming=True)
     category_names = dataset.features["objects"]["category"].feature.names
 
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
     records = []
     for sample in dataset:
         names = [category_names[c] for c in sample["objects"]["category"]]
         record = build_record(sample["image_id"], names)
         if record is not None:
             records.append(record)
+            sample["image"].convert("RGB").save(IMAGES_DIR / f"{record['id']}.jpg", quality=90)
         if len(records) >= TARGET_COUNT:
             break
 
     out_path = Path(__file__).resolve().parent.parent / "app" / "data" / "real_catalog_sample.json"
     out_path.write_text(json.dumps(records, indent=2), encoding="utf-8")
     print(f"Wrote {len(records)} records to {out_path}")
+    print(f"Saved {len(records)} images to {IMAGES_DIR}")
 
 
 if __name__ == "__main__":
