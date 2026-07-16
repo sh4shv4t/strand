@@ -18,8 +18,8 @@ backend/app/data/image_vector_index/
 .env
 .env.local
 
-# Generated submission PDF (regenerate from docs/submission.html)
-docs/*.pdf
+# Local submission write-up (author's own, not part of the tracked repo)
+docs/
 
 # Editors / OS
 .vscode/
