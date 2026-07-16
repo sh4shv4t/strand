@@ -25,7 +25,8 @@ strand/
 │   ├── scripts/
 │   │   ├── pull_fashionpedia_sample.py   # regenerates real_catalog_sample.json + images
 │   │   ├── eval_baselines.py             # dense-only vs. hybrid comparison
-│   │   └── eval_clip_baseline.py         # real vanilla-CLIP image baseline
+│   │   ├── eval_clip_baseline.py         # real vanilla-CLIP image baseline
+│   │   └── tag_real_catalog_scene_style.py   # zero-shot CLIP tagging (tried, not applied -- see Working_notes.md §12.3)
 │   ├── tests/                  # pytest suite, see Testing below
 │   └── app/
 │       ├── schema.py          # Pydantic models for the garment/scene/style JSON schema
