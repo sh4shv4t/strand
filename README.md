@@ -1,16 +1,73 @@
 # Strand
 
 [![CI](https://github.com/sh4shv4t/strand/actions/workflows/ci.yml/badge.svg)](https://github.com/sh4shv4t/strand/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.13-4338CA?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/backend-FastAPI-10B981?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/frontend-React%2019-4338CA?logo=react&logoColor=white)
+![Docker](https://img.shields.io/badge/deploy-Docker%20Compose-10B981?logo=docker&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-41%20passing-4338CA)
 
 Compositional fashion image search — retrieval that binds garments, colors, scene, and style as separate fields instead of pooling everything into one embedding, so a query like "a red tie and a white shirt" doesn't also match a white tie and a red shirt.
 
 Built for the Glance ML internship take-home assignment. See [`Working_notes.md`](./Working_notes.md) for the full engineering log: architecture options considered, dataset plan, empirical results, and open decisions.
+
+![Strand search UI showing the compositional query "A red tie and a white shirt in a formal setting", with the true match ranked first at 93% and its color-swapped decoy second at 53%](./assets/screenshot.png)
 
 ## Overview
 
 Vanilla CLIP/SigLIP embeddings encode a whole image as one dense vector, which is enough for coarse retrieval but fails on compositional queries — attributes get "bag of words"-ed together, so color-swapped images score similarly. Strand instead extracts a structured schema per image (garments bound to slots, plus scene and style) and scores queries against that schema with a weighted-hybrid retriever, falling back to dense similarity for phrasing the schema doesn't capture.
 
 This repo currently ships a scaffold of that pipeline with mocked data: a hand-written catalog, a rule-based query parser standing in for an LLM parser, and a real implementation of the weighted-hybrid scoring, so the retrieval logic and API/UI contract are testable end-to-end ahead of real model and dataset integration.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI["React app"]
+  end
+  subgraph Frontend["nginx (prod) / Vite dev server"]
+    PX["reverse proxy: /api/* → backend"]
+  end
+  subgraph Backend["FastAPI"]
+    MW["observability middleware"]
+    RQ["/api/query"]
+    RC["/api/catalog"]
+    RI["/api/index (Part A)"]
+    RH["/api/health"]
+    RIM["/api/images/*.jpg"]
+  end
+  subgraph Data
+    CAT[("catalog JSON<br/>mock + real Fashionpedia")]
+    CH[("Chroma<br/>caption embeddings")]
+    IMG[("real photos<br/>on disk")]
+    IVX[("Chroma<br/>image embeddings")]
+  end
+  UI --> PX --> MW
+  MW --> RQ & RC & RI & RH & RIM
+  RQ --> CAT
+  RQ --> CH
+  RC --> CAT
+  RI --> IVX
+  RIM --> IMG
+```
+
+Same-origin from the browser's point of view: nginx proxies `/api/*` server-side in production, so no CORS handling is needed on that path at all.
+
+### Query pipeline
+
+```mermaid
+flowchart LR
+  Q["NL query"] --> P["query parser<br/>(keyword-spotting today,<br/>LLM-shaped contract)"]
+  P --> PS["ParsedQuery<br/>garments + scene + style"]
+  PS --> SYM["Symbolic score<br/>slot + type + color match"]
+  PS --> DEN["Dense score<br/>Chroma cosine similarity"]
+  SYM --> BLEND["score = α·symbolic + (1−α)·dense<br/>α = 0.6, or 0 if nothing was recognized"]
+  DEN --> BLEND
+  BLEND --> RANK["Ranked results"]
+```
+
+The query path only ever touches the lightweight parser and an approximate nearest-neighbor lookup, never a heavy model at request time, which is what makes the scalability argument in `Working_notes.md` §13 hold at any catalog size.
 
 ## Tech stack
 
