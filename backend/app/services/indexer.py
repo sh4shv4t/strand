@@ -23,6 +23,12 @@ from app.services.clip_model import ClipDependenciesMissing as IndexingDependenc
 from app.services.clip_model import get_model_and_preprocess
 from app.services.image_vector_store import store_embedding
 
+# IndexingDependenciesMissing is re-exported here (aliased from
+# clip_model.ClipDependenciesMissing) so callers can keep catching it
+# under this module's own name, e.g. routers/index.py; __all__ tells
+# linters that's intentional, not a stray unused import.
+__all__ = ["IndexingDependenciesMissing", "index_image"]
+
 
 def index_image(image_path: str) -> list[float]:
     """Extracts a real image embedding from image_path via CLIP, persists
