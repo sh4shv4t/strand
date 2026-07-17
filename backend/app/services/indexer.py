@@ -11,49 +11,17 @@ This deliberately does not touch color, scene, or style. That axis still
 needs a real VLM call (Working_notes.md Section 4.2), which is not wired
 up yet, and is a separate concern from feature extraction.
 
-Heavy dependencies (torch, open_clip) are not in the app's own
-requirements.txt, see scripts/requirements-eval.txt, so they are imported
-lazily here. Calling index_image without them installed raises
-IndexingDependenciesMissing with a clear message instead of failing at
-import time for the whole app.
+Model loading itself lives in clip_model.py, shared with
+image_similarity.py's query-time text encoding, so both sides of Part
+A/B's real-CLIP integration use the same loaded model instead of two
+copies of it in memory.
 """
 
 from pathlib import Path
 
+from app.services.clip_model import ClipDependenciesMissing as IndexingDependenciesMissing
+from app.services.clip_model import get_model_and_preprocess
 from app.services.image_vector_store import store_embedding
-
-_MODEL_NAME = "ViT-B-32"
-_PRETRAINED = "openai"
-
-_model = None
-_preprocess = None
-
-
-class IndexingDependenciesMissing(RuntimeError):
-    pass
-
-
-def _load_model():
-    global _model, _preprocess
-    if _model is not None:
-        return _model, _preprocess
-
-    try:
-        import open_clip
-        import torch  # noqa: F401
-        from PIL import Image  # noqa: F401
-    except ImportError as exc:
-        raise IndexingDependenciesMissing(
-            "Real feature extraction needs open_clip, torch, and pillow, which "
-            "are not installed by default (they are heavy and only needed for "
-            "indexing, not for serving queries). Install with: "
-            "pip install -r scripts/requirements-eval.txt"
-        ) from exc
-
-    model, _, preprocess = open_clip.create_model_and_transforms(_MODEL_NAME, pretrained=_PRETRAINED)
-    model.eval()
-    _model, _preprocess = model, preprocess
-    return _model, _preprocess
 
 
 def index_image(image_path: str) -> list[float]:
@@ -63,7 +31,7 @@ def index_image(image_path: str) -> list[float]:
     Raises IndexingDependenciesMissing if open_clip/torch/pillow are not
     installed, or FileNotFoundError if image_path does not exist.
     """
-    model, preprocess = _load_model()
+    model, preprocess = get_model_and_preprocess()
 
     import torch
     from PIL import Image

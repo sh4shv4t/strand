@@ -13,3 +13,18 @@ from app.main import app
 @pytest.fixture()
 def client() -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture()
+def isolated_image_store(tmp_path, monkeypatch):
+    """Real-indexing tests must not write into the actual persistent
+    vector store used by production data (app/data/image_vector_index/).
+    Redirects storage to a throwaway directory for the duration of the
+    test, and resets the module-level singleton so a fresh client opens
+    against it. Shared by test_indexer.py and test_image_similarity.py.
+    """
+    import app.services.image_vector_store as store_module
+
+    monkeypatch.setattr(store_module, "PERSIST_DIR", tmp_path / "image_vector_index")
+    monkeypatch.setattr(store_module, "_client", None)
+    monkeypatch.setattr(store_module, "_collection", None)
