@@ -93,6 +93,18 @@ def test_lower_confidence_scales_alpha_down():
     assert unsure_result.score != confident_result.score
 
 
+def test_garment_synonym_matches_a_differently_worded_type():
+    """Before garment_vocabulary.py's canonicalization, this failed
+    silently: the keyword parser's plural "shoes" never matched any real
+    catalog record, all of which are typed "shoe" (Fashionpedia's
+    singular ground-truth category). fp_6410 is a real catalog record
+    with a "shoe" garment."""
+    parsed = ParsedQuery(raw_query="shoes", garments=[{"slot": "footwear", "type": "shoes"}])
+    results = search(parsed, top_k=len(get_catalog()))
+    match = _find(results, "fp_6410")
+    assert "shoes" in match.matched_fields
+
+
 def test_blend_dense_averages_when_image_signal_exists():
     assert _blend_dense(0.4, 0.8) == pytest.approx(0.6)
 

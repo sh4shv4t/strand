@@ -41,6 +41,7 @@ full investigation and measured numbers.
 from app.schema import Garment, ImageRecord, ParsedQuery, ScoredResult
 from app.services import image_similarity
 from app.services.catalog import get_catalog
+from app.services.garment_vocabulary import canonical_type
 from app.services.vector_store import DenseScorer
 
 _CATALOG: list[ImageRecord] = get_catalog()
@@ -55,7 +56,7 @@ def _garment_matches(query_garment: Garment, record_garments: list[Garment]) -> 
     for rg in record_garments:
         if rg.slot != query_garment.slot:
             continue
-        if query_garment.type and query_garment.type != rg.type:
+        if query_garment.type and canonical_type(query_garment.type) != canonical_type(rg.type):
             continue
         if query_garment.color and rg.color and query_garment.color != rg.color:
             continue
