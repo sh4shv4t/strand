@@ -5,7 +5,7 @@
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-10B981?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/frontend-React%2019-4338CA?logo=react&logoColor=white)
 ![Docker](https://img.shields.io/badge/deploy-Docker%20Compose-10B981?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-41%20passing-4338CA)
+![Tests](https://img.shields.io/badge/tests-47%20passing-4338CA)
 
 Compositional fashion image search — retrieval that binds garments, colors, scene, and style as separate fields instead of pooling everything into one embedding, so a query like "a red tie and a white shirt" doesn't also match a white tie and a red shirt.
 
@@ -89,14 +89,19 @@ strand/
 │   │   ├── eval_baselines.py             # dense-only vs. hybrid comparison
 │   │   ├── eval_clip_baseline.py         # real vanilla-CLIP image baseline
 │   │   ├── tag_real_catalog_scene_style.py   # zero-shot CLIP tagging, tried and not applied, see Working_notes.md §12.3
-│   │   └── build_image_vector_index.py   # Part A batch driver: real CLIP feature extraction + persistent storage
+│   │   ├── build_image_vector_index.py   # Part A batch driver: real CLIP feature extraction + persistent storage
+│   │   └── extract_attributes_with_vlm.py   # fills in color/scene/style via Gemini, needs GEMINI_API_KEY
 │   ├── tests/                  # pytest suite, see Testing below
 │   └── app/
-│       ├── schema.py          # Pydantic models for the garment/scene/style JSON schema
+│       ├── schema.py          # Pydantic models, incl. the shared ExtractedAttributes schema
 │       ├── observability.py   # structured logging + OpenTelemetry (console exporter)
 │       ├── data/               # mock decoy-pair records, a real Fashionpedia sample, real photos
 │       ├── services/
-│       │   ├── query_parser.py    # rule-based parser (stand-in for an LLM query parser)
+│       │   ├── query_parsing.py       # entry point: real LLM parser, falls back to keywords
+│       │   ├── query_parser.py        # keyword-spotting fallback parser
+│       │   ├── llm_query_parser.py    # real Gemini query parser
+│       │   ├── vlm_attribute_extractor.py  # real Gemini image attribute extractor
+│       │   ├── gemini_client.py       # shared Gemini SDK wrapper
 │       │   ├── catalog.py         # loads/caches the combined catalog
 │       │   ├── vector_store.py    # dense similarity via a local Chroma collection
 │       │   ├── retriever.py       # weighted-hybrid scoring (symbolic + dense)
@@ -169,7 +174,22 @@ pip install -r scripts/requirements-eval.txt
 python scripts/build_image_vector_index.py
 ```
 
-Runs every real Fashionpedia photo on disk through a local CLIP model (`open_clip`, no API key) and persists a real embedding per image to an on-disk Chroma collection at `app/data/image_vector_index/` (gitignored, regenerable). This is genuine feature extraction from pixels, not from labels, closing the literal Part A requirement the mocked catalog alone doesn't. It doesn't touch color, scene, or style; that axis still needs a real VLM call (`Working_notes.md` §4.2), and isn't wired into live query scoring yet (Tier 2's own numbers show plain CLIP underperforming the schema approach for garment-presence queries, see §12.2).
+Runs every real Fashionpedia photo on disk through a local CLIP model (`open_clip`, no API key) and persists a real embedding per image to an on-disk Chroma collection at `app/data/image_vector_index/` (gitignored, regenerable). This is genuine feature extraction from pixels, not from labels, closing the literal Part A requirement the mocked catalog alone doesn't. It doesn't touch color, scene, or style; that axis needs a real VLM call, see below.
+
+## Real LLM and VLM integration (needs a Gemini API key)
+
+```bash
+cd backend
+# GEMINI_API_KEY=... in backend/.env, see .env.example
+python scripts/extract_attributes_with_vlm.py   # fills in color/scene/style on the real catalog
+```
+
+Two real Gemini call sites, both code-complete and unit-tested, neither exercised against a live key yet:
+
+- `services/llm_query_parser.py` replaces the keyword-spotting parser at query time, using the exact prompt drafted in `Working_notes.md` §4.3.1.
+- `services/vlm_attribute_extractor.py` extracts color, scene, and style from a real photo at index time, keeping Fashionpedia's own ground-truth garment presence and only asking the VLM for the axis it doesn't cover.
+
+`services/query_parsing.py` is what `/api/query` actually calls: it tries the real parser first and falls back to the keyword parser automatically on `GeminiNotConfigured` or any other failure (network, rate limit, malformed response), so the app behaves exactly as it does today until a key is set, and degrades to that same behavior rather than erroring if a call ever fails afterward.
 
 ## API
 
@@ -183,8 +203,8 @@ Runs every real Fashionpedia photo on disk through a local CLIP model (`open_cli
 
 Partway from mocked to real, not a finished system:
 
-- The catalog combines 12 hand-written mock records with 40 real Fashionpedia records; garment detection on the real records uses the dataset's own labels, but `color`, `scene`, and `style` are honestly `null` there, not guessed.
-- The query parser is keyword-spotting, not an LLM, and is not yet truly zero-shot: a query outside its recognized vocabulary gets no structured signal at all. It falls back cleanly to dense-only matching in that case (see `retriever.py`'s `_has_structured_signal`), but the real fix is the LLM parser drafted in `Working_notes.md` §4.3.1.
-- Dense retrieval uses real embeddings (Chroma, local, no API key); symbolic retrieval and the weighted-hybrid blend are real. Real image feature extraction (Part A) is implemented via local CLIP, see above; no VLM is integrated yet for color/scene/style, so those fields stay empty on real records.
+- The catalog combines 12 hand-written mock records with 40 real Fashionpedia records; garment detection on the real records uses the dataset's own labels, but `color`, `scene`, and `style` stay `null` there until `scripts/extract_attributes_with_vlm.py` is actually run with a key.
+- The real LLM query parser and VLM attribute extractor are written and unit-tested (mocked/error-path tests only, no real API call made in CI) but not yet exercised against a live Gemini key. Until a key is set, `/api/query` transparently uses the keyword-spotting fallback, same as before this was added.
+- Dense retrieval uses real embeddings (Chroma, local, no API key); symbolic retrieval and the weighted-hybrid blend are real. Real image feature extraction (Part A) is implemented via local CLIP, see above.
 
 See `Working_notes.md` sections 9 through 13 for the full list of decisions made, what's still open, the testing/CI/observability setup, the empirical baseline comparison, and a measured scaling estimate.
