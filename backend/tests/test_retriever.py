@@ -57,6 +57,40 @@ def test_no_structured_signal_uses_dense_score_at_full_strength():
         assert r.score == r.dense_score
 
 
+def test_lower_confidence_scales_alpha_down():
+    """A parse the parser was less sure about should trust its symbolic
+    signal proportionally less, not get the same fixed alpha weight as a
+    fully-confident parse. Same garments/scene/style, only confidence
+    differs, score should follow score = (alpha*confidence)*symbolic +
+    (1 - alpha*confidence)*dense exactly."""
+    base_kwargs = dict(
+        raw_query="a red tie and a white shirt in a formal setting",
+        garments=[
+            {"slot": "upper", "type": "shirt", "color": "white"},
+            {"slot": "accessory", "type": "tie", "color": "red"},
+        ],
+        style="formal",
+    )
+    confident = ParsedQuery(**base_kwargs, confidence=1.0)
+    unsure = ParsedQuery(**base_kwargs, confidence=0.5)
+
+    confident_result = _find(search(confident, top_k=len(get_catalog())), "img_005")
+    unsure_result = _find(search(unsure, top_k=len(get_catalog())), "img_005")
+
+    # Same symbolic/dense components either way, only the blend differs.
+    assert confident_result.symbolic_score == unsure_result.symbolic_score
+    assert confident_result.dense_score == unsure_result.dense_score
+
+    alpha = 0.6
+    symbolic, dense = confident_result.symbolic_score, confident_result.dense_score
+    expected_confident = round(alpha * 1.0 * symbolic + (1 - alpha * 1.0) * dense, 4)
+    expected_unsure = round(alpha * 0.5 * symbolic + (1 - alpha * 0.5) * dense, 4)
+
+    assert confident_result.score == expected_confident
+    assert unsure_result.score == expected_unsure
+    assert unsure_result.score != confident_result.score
+
+
 def test_scene_and_style_match_contribute_to_score():
     parsed = ParsedQuery(raw_query="office style query", scene="office", style="business")
     results = search(parsed, top_k=len(get_catalog()))

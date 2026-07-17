@@ -5,11 +5,13 @@ from Working_notes.md Section 3. Symbolic matching lives here; dense
 similarity is delegated to vector_store.DenseScorer, and catalog loading to
 catalog.load_catalog, this module only blends the two.
 
-Falls back to alpha=0 for queries with no structured signal at all (see
-_has_structured_signal): with no garments, scene, or style recognized,
-symbolic_score is 0.0 for every record, so the query is genuinely zero-shot
-and dense similarity should be reported at full strength rather than
-discounted for a symbolic signal that doesn't exist.
+Scales alpha by parsed.confidence (see _effective_alpha): a query the
+parser only partially recognized should trust its symbolic signal
+proportionally less, not get the same fixed weight as a fully-recognized
+query. A query with no structured signal at all has confidence pinned to
+0 effectively, since symbolic_score is 0.0 for every record regardless of
+alpha in that case, so dense similarity is reported at full strength
+rather than discounted for a symbolic signal that doesn't exist.
 """
 
 from app.schema import Garment, ImageRecord, ParsedQuery, ScoredResult
@@ -67,18 +69,31 @@ def _has_structured_signal(parsed: ParsedQuery) -> bool:
     return bool(parsed.garments or parsed.scene or parsed.style)
 
 
+def _effective_alpha(parsed: ParsedQuery, alpha: float) -> float:
+    # No structured signal at all: symbolic_score is 0.0 for every record
+    # regardless of alpha, so this is a genuinely zero-shot query. Using
+    # alpha=0 here reports the dense score at full strength instead of
+    # discounting it for a symbolic signal that doesn't exist -- ranking
+    # is unaffected either way (every record scaled the same amount), but
+    # a perfect dense hit would otherwise misleadingly show as 40% instead
+    # of 100%.
+    if not _has_structured_signal(parsed):
+        return 0.0
+
+    # Some signal, but not necessarily all of it: parsed.confidence (0.4 to
+    # 1.0 from the keyword parser depending on how much of the query it
+    # recognized, always 1.0 from a successful real LLM parse) scales alpha
+    # proportionally, so a query the parser only half-understood trusts
+    # its symbolic match less and leans further on dense similarity,
+    # rather than getting the same fixed weight as a fully-recognized one.
+    return alpha * parsed.confidence
+
+
 def search(parsed: ParsedQuery, top_k: int = 5, alpha: float = 0.6) -> list[ScoredResult]:
-    # When the parser recognizes nothing (a query outside its keyword
-    # vocabulary), symbolic_score is 0.0 for every record regardless of
-    # alpha, so this is a genuinely zero-shot query: dense similarity is
-    # the only real signal available. Discounting it by (1 - alpha) here
-    # doesn't change the ranking (every record is scaled the same amount),
-    # but it does understate how good the match actually is -- a perfect
-    # dense hit would otherwise show as a 40% match instead of 100%. Using
-    # alpha=0 in this case reports the dense score at full strength.
-    effective_alpha = alpha if _has_structured_signal(parsed) else 0.0
+    effective_alpha = _effective_alpha(parsed, alpha)
 
     dense_scores = _DENSE_SCORER.score(parsed.raw_query)
+
     scored: list[ScoredResult] = []
 
     for record in _CATALOG:
