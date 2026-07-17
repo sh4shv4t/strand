@@ -5,7 +5,7 @@
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-10B981?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/frontend-React%2019-4338CA?logo=react&logoColor=white)
 ![Docker](https://img.shields.io/badge/deploy-Docker%20Compose-10B981?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-47%20passing-4338CA)
+![Tests](https://img.shields.io/badge/tests-59%20passing-4338CA)
 
 Compositional fashion image search — retrieval that binds garments, colors, scene, and style as separate fields instead of pooling everything into one embedding, so a query like "a red tie and a white shirt" doesn't also match a white tie and a red shirt.
 
