@@ -361,3 +361,53 @@ This only handles structured attributes supplied at index time (manually, or eve
 ### 14.4 A plain CLI, satisfying Part B's literal wording
 
 §3's Part B requirement is literally "create a script that accepts a natural language string and returns the top k matching images." The FastAPI + React app already does this and far more, but there was no single runnable script matching that literal description without starting a server or opening a browser. `backend/scripts/search.py` adds one: `python scripts/search.py "a query"` prints ranked results with their scores and matched fields. It calls `query_parsing.parse_query` + `retriever.search` directly, the exact code path `/api/query` uses, not a separate reimplementation, so it automatically picks up the real LLM parser once `GEMINI_API_KEY` is set, with no separate maintenance burden.
+
+---
+
+## 15. Two more ML optimizations, one adopted, one rejected
+
+Both chosen specifically because neither is blocked on `GEMINI_API_KEY` or a labeled eval set, unlike the reranker/hard-negative-mining items in §8. Both measured against the same 8-probe-query, real-ground-truth harness Tier 2 (§12.2) already established, not assumed.
+
+### 15.1 Adopted: swap the CLIP backbone for a fashion-tuned checkpoint
+
+`clip_model.py` used vanilla `open_clip` ViT-B-32/openai, the exact "vanilla CLIP" baseline the assignment's own hint says is weak on fashion attributes, for the *production* image-similarity signal, not just the Tier 2 comparison baseline. Marqo-FashionCLIP (`hf-hub:Marqo/marqo-fashionCLIP`, Apache-2.0, loaded through `open_clip`'s own HF-hub integration) was cited in §2 as an architecture option but never actually tried as a drop-in backbone swap for the image embeddings this project already had wired in (§14.1).
+
+Measured on the same 8 real probe queries as Tier 2, isolating just the image-embedding signal (bypassing the symbolic/caption blend entirely, to test the backbone alone):
+
+```
+                          mean precision@5
+vanilla ViT-B-32/openai          0.725
+Marqo-FashionCLIP                1.000
+```
+
+A clean, decisive improvement, every one of the 8 probe queries hit 1.00 precision@5 with the fashion-tuned backbone, including `"a shirt"`, the query vanilla CLIP scored 0.00 on. Same 512-dim output as ViT-B-32/openai, so this was a true drop-in swap, no schema change, no code beyond `clip_model.py`'s two constants. `scripts/eval_clip_baseline.py` deliberately still hardcodes vanilla ViT-B-32/openai directly rather than importing from `clip_model.py`, since that script's whole purpose is comparing against vanilla CLIP as the baseline, not against whatever backbone the production system happens to use, changing that would quietly invalidate its own comparison.
+
+**Honest caveat: this improvement is real but doesn't move the full blended pipeline's precision@5 on these same 8 probe queries.** Re-running Tier 2 end to end after regenerating all 1,000 embeddings with the new backbone gives *identical* dense-only (0.850) and hybrid (1.000) mean precision@5 to before the swap. That's not the backbone swap failing, it's these particular probe queries (single garment-type lookups like `"a jacket"`) already saturating on caption similarity alone: the caption literally contains the ground-truth category name (`"jacket (outerwear)"`), so caption-dense similarity alone already hits the ceiling these coarse queries can measure, leaving no room for a better image signal to show through in *this* metric. The 0.725→1.000 gain is real and measured, but only demonstrated in isolation (image-similarity alone, bypassing the caption signal entirely); it should show up more where captions are weaker, compositional or color-specific queries the real catalog's null `color` field can't help with, and queries against future images that never get a rich caption. Reporting both numbers rather than only the flattering one.
+
+All 1,000 persisted image embeddings were regenerated with the new backbone (`build_image_vector_index.py`, re-run after wiping the old vanilla-CLIP embeddings, they are not comparable across backbones and mixing them would silently corrupt every similarity score). Full test suite still passes unchanged, including the real-CLIP tests in `test_image_similarity.py`/`test_indexer.py`, which only assert general sanity (a red image scores higher than a blue one for a "red" query), not anything backbone-specific.
+
+### 15.2 Rejected, measured: embedding whitening
+
+PCA-whitening (correcting the known anisotropy of dense embedding spaces to sharpen cosine-similarity contrast, "whitening-BERT"-style) is a training-free technique: fit a linear transform from the catalog's own embedding statistics, no labels, no fine-tuning. Tried it on the persisted image embeddings, computing the whitening transform from all 1,000 vectors and applying it to both catalog and query embeddings before cosine similarity.
+
+Full-rank whitening was a sharp regression, not an improvement:
+
+```
+                    mean precision@5
+raw (unwhitened)          0.725
+whitened (full rank)      0.250
+```
+
+Suspecting the regression came from amplifying noisy, low-variance directions (only 1,000 samples across 512 dimensions leaves several near-zero eigenvalues, and dividing by their square root blows up whatever noise lives there), tried truncated whitening keeping only the top-k principal components instead of the full 512:
+
+```
+top-k components   mean precision@5
+16                        0.475
+32                        0.450
+64                        0.475
+128                       0.475
+256                       0.350
+512 (full rank)           0.250
+```
+
+Every truncation level tested still underperforms doing nothing (0.725). Not adopted, at any tested configuration. The most likely root cause isn't sample size alone: the whitening transform was fit on the catalog's *image* embedding statistics only, then applied to *query text* embeddings, a different modality. CLIP-family models are known to have a "modality gap", image and text embeddings occupy systematically different regions of the shared space even after contrastive training aligns them well enough for retrieval, so a transform derived purely from image-side statistics doesn't necessarily describe how text queries should be reshaped, and can actively fight the cross-modal alignment CLIP's own training already established. This is a genuinely different failure mode from §13.1's symbolic pre-filter rejection (a structural ranking-architecture mismatch) or §12.3's CLIP zero-shot tagging rejection (prompt instability); this one is a cross-modal statistics mismatch, worth distinguishing rather than filing under a generic "didn't help."

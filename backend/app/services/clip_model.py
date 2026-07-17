@@ -1,8 +1,22 @@
-"""Shared local CLIP model (open_clip, ViT-B-32, openai weights, no API
-key). Used by both indexer.py (image encoding, Part A) and
-image_similarity.py (text encoding, to rank against those same
-embeddings at query time) -- loading it once and sharing the instance
-avoids holding two copies of the same model in memory in one process.
+"""Shared local CLIP model (open_clip, no API key). Used by both
+indexer.py (image encoding, Part A) and image_similarity.py (text
+encoding, to rank against those same embeddings at query time) --
+loading it once and sharing the instance avoids holding two copies of
+the same model in memory in one process.
+
+Backbone is Marqo-FashionCLIP (Apache-2.0, loaded via open_clip's
+hf-hub integration), not vanilla ViT-B-32/openai. Measured directly
+against the real 1,000-image catalog on the same 8 probe queries Tier 2
+(Working_notes.md Section 12.2) already used: vanilla CLIP scores 0.725
+mean precision@5, Marqo-FashionCLIP scores a perfect 1.000, a fashion-
+tuned backbone rather than a generic one, exactly the axis the
+assignment's own hint says vanilla CLIP is weak on. Same 512-dim output
+as ViT-B-32/openai, so this is a drop-in swap: no schema change, no
+change to any persisted-embedding dimension assumption elsewhere.
+scripts/eval_clip_baseline.py intentionally still hardcodes vanilla
+ViT-B-32/openai directly, not this module, since that script's whole
+purpose is comparing against vanilla CLIP as the baseline, not against
+whatever backbone the production system happens to use.
 
 Heavy dependencies (torch, open_clip, pillow) are not in the app's own
 requirements.txt, see scripts/requirements-eval.txt, so they are imported
@@ -11,8 +25,8 @@ them installed raises ClipDependenciesMissing with a clear message
 instead of failing at import time for the whole app.
 """
 
-MODEL_NAME = "ViT-B-32"
-PRETRAINED = "openai"
+MODEL_NAME = "hf-hub:Marqo/marqo-fashionCLIP"
+PRETRAINED = None
 
 _model = None
 _preprocess = None
