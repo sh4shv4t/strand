@@ -148,6 +148,21 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
+This alone gets you a working system: the real Fashionpedia garment/scene/style data is already in the committed `real_catalog_sample.json`, so symbolic and caption-dense scoring both work immediately. Two things are gitignored and regenerable rather than committed (101MB of JPEGs and a CLIP embedding index don't belong in git), and without them the app still runs and answers queries correctly, but degrades quietly instead of erroring:
+
+- **The real photos** (`app/data/fashionpedia_images/`): without them, `/api/images/*.jpg` 404s and the UI shows broken image links instead of real photos.
+- **The real CLIP image embeddings** (`app/data/image_vector_index/`): without them, `image_similarity.score()` returns `{}` for every query and ranking silently falls back to caption-only dense similarity, still correct, just missing the image-pixel signal `Working_notes.md` §14.1 describes.
+
+To get both:
+
+```bash
+pip install -r scripts/requirements-eval.txt   # adds datasets, pillow, open_clip_torch
+python scripts/pull_fashionpedia_sample.py     # downloads the 1,000 real photos
+python scripts/build_image_vector_index.py     # embeds them with local CLIP, no API key
+```
+
+Each is independently re-runnable and idempotent (safe to run again after a fresh clone or a dependency bump).
+
 ### Frontend
 
 ```bash
@@ -165,6 +180,8 @@ docker compose up --build
 ```
 
 Serves the frontend at `http://localhost:5173` (nginx, proxying `/api/*` server-side to the backend container — no CORS involved) and the backend directly at `http://localhost:8000`. First boot downloads the ~80MB Chroma embedding model before the backend responds to anything; a named volume (`chroma-cache`) persists it so this only happens once. Copy `backend/.env.example` to `backend/.env` and uncomment the `env_file` line in `docker-compose.yml` to pass real env vars through.
+
+Same caveat as above applies here: `backend/Dockerfile` does a one-time `COPY app ./app` at build time, so run the two `pull_fashionpedia_sample.py` / `build_image_vector_index.py` commands above *before* `docker compose up --build`, not after, and rebuild whenever you regenerate them. Without that, the container starts and serves correct results, just without real photos or the image-similarity signal, same degrade as running the backend directly.
 
 ## Search from the command line
 
