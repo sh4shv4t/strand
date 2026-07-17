@@ -1,7 +1,10 @@
-"""Exercises query_parser against the 5 eval queries from Working_notes.md
-Section 6 -- the same set drafted as few-shot examples in Section 4.3.1."""
+"""Exercises the keyword-spotting fallback parser against the 5 eval
+queries from Working_notes.md Section 6 -- the same set drafted as
+few-shot examples for the real LLM parser in Section 4.3.1. See
+test_query_parsing.py for the orchestrator that picks between this and
+the real parser, and test_llm_query_parser.py for the real one."""
 
-from app.services.query_parser import parse_query
+from app.services.query_parser import parse_query_keywords as parse_query
 
 
 def _has_garment(parsed, slot: str, garment_type: str, color: str | None = None) -> bool:

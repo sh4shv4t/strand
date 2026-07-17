@@ -21,6 +21,19 @@ class Garment(BaseModel):
     color: Optional[str] = None
 
 
+class ExtractedAttributes(BaseModel):
+    """Garments/scene/style shape shared by both Gemini call sites: the
+    query-time parser (llm_query_parser.py) extracts this from query text,
+    the index-time extractor (vlm_attribute_extractor.py) extracts the
+    same shape from an image. Used directly as the Gemini response_schema
+    so the SDK returns a validated instance of this model, not raw JSON.
+    """
+
+    garments: list[Garment] = Field(default_factory=list)
+    scene: Optional[Scene] = None
+    style: Optional[Style] = None
+
+
 class ImageRecord(BaseModel):
     id: str
     garments: list[Garment]

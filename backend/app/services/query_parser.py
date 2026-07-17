@@ -1,14 +1,15 @@
-"""Mock query parser.
+"""Keyword-spotting query parser: the fallback path.
 
-Stands in for the LLM few-shot parser described in Working_notes.md
-Section 4.3. Same input/output contract (raw NL query -> ParsedQuery),
-so this can be swapped for a real LLM call later without touching the
-retriever or the API surface.
+query_parsing.py tries the real LLM parser (llm_query_parser.py) first
+and falls back to parse_query_keywords() here whenever Gemini is not
+configured or a call fails, so the app always answers a query rather
+than erroring out. Same input/output contract either way: raw NL query
+in, ParsedQuery out.
 
 Approach: keyword spotting for colors/garment-types/scenes/styles, with
 a garment's color taken from the color word immediately preceding it in
 the query. This is intentionally simple and will misparse anything the
-keyword lists don't cover -- that's expected of a stand-in, not a bug.
+keyword lists don't cover -- that's expected of a fallback, not a bug.
 """
 
 import re
@@ -107,7 +108,7 @@ def _find_garments(query_lower: str) -> list[Garment]:
     return garments
 
 
-def parse_query(raw_query: str) -> ParsedQuery:
+def parse_query_keywords(raw_query: str) -> ParsedQuery:
     query_lower = raw_query.lower()
 
     garments = _find_garments(query_lower)

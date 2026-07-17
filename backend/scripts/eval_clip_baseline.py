@@ -27,7 +27,10 @@ import torch
 from PIL import Image
 
 from app.services.catalog import get_catalog
-from app.services.query_parser import parse_query
+# Uses the keyword parser directly, not query_parsing.parse_query, so this
+# baseline comparison stays deterministic and free regardless of whether a
+# GEMINI_API_KEY happens to be set in the environment it runs in.
+from app.services.query_parser import parse_query_keywords as parse_query
 from app.services.retriever import search
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent

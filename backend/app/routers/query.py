@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.observability import logger, tracer
 from app.schema import QueryRequest, QueryResponse
-from app.services.query_parser import parse_query
+from app.services.query_parsing import parse_query
 from app.services.retriever import search
 
 router = APIRouter(prefix="/api", tags=["query"])
