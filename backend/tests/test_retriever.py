@@ -2,8 +2,10 @@
 so the dense half is the deterministic word-overlap fallback -- these tests
 exercise symbolic scoring and score blending against the real catalog."""
 
+import pytest
+
 from app.schema import ParsedQuery
-from app.services.retriever import get_catalog, search
+from app.services.retriever import _blend_dense, get_catalog, search
 
 
 def _find(results, record_id: str):
@@ -89,6 +91,17 @@ def test_lower_confidence_scales_alpha_down():
     assert confident_result.score == expected_confident
     assert unsure_result.score == expected_unsure
     assert unsure_result.score != confident_result.score
+
+
+def test_blend_dense_averages_when_image_signal_exists():
+    assert _blend_dense(0.4, 0.8) == pytest.approx(0.6)
+
+
+def test_blend_dense_falls_back_to_caption_only_without_an_image_embedding():
+    """The 12 hand-written mock records have no real photo, so no stored
+    CLIP embedding, image_similarity.score() simply won't have an entry
+    for them, this is that case."""
+    assert _blend_dense(0.4, None) == 0.4
 
 
 def test_scene_and_style_match_contribute_to_score():

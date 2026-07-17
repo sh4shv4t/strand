@@ -5,6 +5,16 @@ from Working_notes.md Section 3. Symbolic matching lives here; dense
 similarity is delegated to vector_store.DenseScorer, and catalog loading to
 catalog.load_catalog, this module only blends the two.
 
+"dense_similarity" is itself a blend of two independent real signals when
+both exist for a record: caption-text similarity (DenseScorer, always
+available) and real CLIP image-pixel similarity (image_similarity,
+available only for records with a stored embedding, the 40 real
+Fashionpedia photos, not the 12 hand-written mock records). This is what
+actually wires Part A's real image embeddings into ranking, previously
+index_image() persisted them and nothing ever read them back. See
+_blend_dense and Working_notes.md Section 14 for why a plain mean, not a
+new tunable weight.
+
 Scales alpha by parsed.confidence (see _effective_alpha): a query the
 parser only partially recognized should trust its symbolic signal
 proportionally less, not get the same fixed weight as a fully-recognized
@@ -29,6 +39,7 @@ full investigation and measured numbers.
 """
 
 from app.schema import Garment, ImageRecord, ParsedQuery, ScoredResult
+from app.services import image_similarity
 from app.services.catalog import get_catalog
 from app.services.vector_store import DenseScorer
 
@@ -103,16 +114,29 @@ def _effective_alpha(parsed: ParsedQuery, alpha: float) -> float:
     return alpha * parsed.confidence
 
 
+def _blend_dense(caption_sim: float, image_sim: float | None) -> float:
+    # A plain mean, not a new tunable weight: this project already has one
+    # unvalidated hyperparameter (alpha, see Working_notes.md Section 8),
+    # adding a second before either is validated against real data would
+    # compound the problem rather than fix anything. Records with no
+    # stored image embedding (the 12 hand-written mock records) fall back
+    # to caption similarity alone, exactly the pre-existing behavior.
+    if image_sim is None:
+        return caption_sim
+    return (caption_sim + image_sim) / 2
+
+
 def search(parsed: ParsedQuery, top_k: int = 5, alpha: float = 0.6) -> list[ScoredResult]:
     effective_alpha = _effective_alpha(parsed, alpha)
 
-    dense_scores = _DENSE_SCORER.score(parsed.raw_query)
+    caption_scores = _DENSE_SCORER.score(parsed.raw_query)
+    image_scores = image_similarity.score(parsed.raw_query)
 
     scored: list[ScoredResult] = []
 
     for record in _CATALOG:
         symbolic, matched_fields = _symbolic_score(parsed, record)
-        dense = dense_scores.get(record.id, 0.0)
+        dense = _blend_dense(caption_scores.get(record.id, 0.0), image_scores.get(record.id))
         score = effective_alpha * symbolic + (1 - effective_alpha) * dense
 
         scored.append(
