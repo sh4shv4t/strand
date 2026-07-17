@@ -8,7 +8,7 @@ catalog.load_catalog, this module only blends the two.
 "dense_similarity" is itself a blend of two independent real signals when
 both exist for a record: caption-text similarity (DenseScorer, always
 available) and real CLIP image-pixel similarity (image_similarity,
-available only for records with a stored embedding, the 40 real
+available only for records with a stored embedding, the real
 Fashionpedia photos, not the 12 hand-written mock records). This is what
 actually wires Part A's real image embeddings into ranking, previously
 index_image() persisted them and nothing ever read them back. See

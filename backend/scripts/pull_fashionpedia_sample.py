@@ -20,7 +20,12 @@ VLM API key or local model is wired up). This script only replaces the
 mocked *garment detection* half of indexing with real data.
 
 Streaming iteration order is deterministic (no shuffling), so rerunning
-this reproduces the same 40 image_ids as the committed real_catalog_sample.json.
+this reproduces the same image_ids as the committed real_catalog_sample.json.
+
+TARGET_COUNT is 1000 (the top of the assignment's stated 500-1,000 image
+range): an earlier pass ran this at 40 for fast local iteration during
+scaffolding, and that smaller sample was never re-pulled at the size the
+assignment actually asks for before this.
 """
 
 import json
@@ -28,7 +33,7 @@ from pathlib import Path
 
 from datasets import load_dataset
 
-TARGET_COUNT = 40
+TARGET_COUNT = 1000
 IMAGES_DIR = Path(__file__).resolve().parent.parent / "app" / "data" / "fashionpedia_images"
 
 # Fashionpedia category name -> (slot, our type name). Categories not listed
