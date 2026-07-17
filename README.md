@@ -17,7 +17,17 @@ Built for the Glance ML internship take-home assignment. See [`Working_notes.md`
 
 Vanilla CLIP/SigLIP embeddings encode a whole image as one dense vector, which is enough for coarse retrieval but fails on compositional queries — attributes get "bag of words"-ed together, so color-swapped images score similarly. Strand instead extracts a structured schema per image (garments bound to slots, plus scene and style) and scores queries against that schema with a weighted-hybrid retriever, falling back to dense similarity for phrasing the schema doesn't capture.
 
-This repo currently ships a scaffold of that pipeline with mocked data: a hand-written catalog, a rule-based query parser standing in for an LLM parser, and a real implementation of the weighted-hybrid scoring, so the retrieval logic and API/UI contract are testable end-to-end ahead of real model and dataset integration.
+The catalog is 1,000 real Fashionpedia photos (garment detection from the dataset's own ground truth) plus 12 hand-written records that isolate the compositional-binding failure with a color-swapped decoy pair. Retrieval blends three real signals: symbolic slot/type/color matching, caption-text similarity, and real CLIP image-pixel similarity, the last of which is compared against an actual persisted embedding per photo, not a stand-in. The query parser is a two-tier real-LLM-first design (`services/query_parsing.py`): a real Gemini parser when `GEMINI_API_KEY` is set, transparently falling back to a rule-based keyword parser otherwise, so the app always answers rather than erroring. `color`, `scene`, and `style` on the real photos are still `null` pending that same key, see [Status and limitations](#status-and-limitations).
+
+### Part A / Part B mapping
+
+The assignment asks for two distinct workflows. Strand keeps them as one FastAPI app with a module-level split rather than two top-level directories (see `Working_notes.md` §9 for why), so here is the explicit mapping:
+
+| | Files | Entry points |
+|---|---|---|
+| **Part A: The Indexer** | `services/indexer.py`, `services/clip_model.py`, `services/image_vector_store.py`, `services/vlm_attribute_extractor.py` | `POST /api/index`, `scripts/build_image_vector_index.py`, `scripts/extract_attributes_with_vlm.py` |
+| **Part B: The Retriever** | `services/query_parsing.py`, `services/llm_query_parser.py`, `services/query_parser.py`, `services/retriever.py`, `services/vector_store.py`, `services/image_similarity.py`, `services/garment_vocabulary.py` | `POST /api/query`, `scripts/search.py` |
+| **Shared** | `schema.py` (both sides speak the same `ExtractedAttributes`/`ImageRecord` schema), `services/catalog.py` | — |
 
 ## Architecture
 
@@ -33,41 +43,46 @@ flowchart LR
     MW["observability middleware"]
     RQ["/api/query"]
     RC["/api/catalog"]
-    RI["/api/index (Part A)"]
+    RI["/api/index (Part A,<br/>+ optional cold-start registration)"]
     RH["/api/health"]
     RIM["/api/images/*.jpg"]
   end
   subgraph Data
-    CAT[("catalog JSON<br/>mock + real Fashionpedia")]
+    CAT[("catalog JSON<br/>mock + 1,000 real Fashionpedia")]
     CH[("Chroma<br/>caption embeddings")]
     IMG[("real photos<br/>on disk")]
-    IVX[("Chroma<br/>image embeddings")]
+    IVX[("Chroma<br/>real CLIP image embeddings")]
   end
   UI --> PX --> MW
   MW --> RQ & RC & RI & RH & RIM
   RQ --> CAT
   RQ --> CH
+  RQ --> IVX
   RC --> CAT
   RI --> IVX
+  RI -.->|"registers a new record"| CAT
   RIM --> IMG
 ```
 
-Same-origin from the browser's point of view: nginx proxies `/api/*` server-side in production, so no CORS handling is needed on that path at all.
+Same-origin from the browser's point of view: nginx proxies `/api/*` server-side in production, so no CORS handling is needed on that path at all. `/api/query` reads both Chroma collections, real image embeddings and caption embeddings are two independent signals blended together, see the query pipeline below.
 
 ### Query pipeline
 
 ```mermaid
 flowchart LR
-  Q["NL query"] --> P["query parser<br/>(keyword-spotting today,<br/>LLM-shaped contract)"]
-  P --> PS["ParsedQuery<br/>garments + scene + style"]
-  PS --> SYM["Symbolic score<br/>slot + type + color match"]
-  PS --> DEN["Dense score<br/>Chroma cosine similarity"]
-  SYM --> BLEND["score = α·symbolic + (1−α)·dense<br/>α = 0.6, or 0 if nothing was recognized"]
-  DEN --> BLEND
+  Q["NL query"] --> P["query_parsing.py<br/>real LLM parser, falls back to<br/>keyword-spotting if no API key"]
+  P --> PS["ParsedQuery<br/>garments + scene + style + confidence"]
+  PS --> SYM["Symbolic score<br/>slot + canonical-type + color match"]
+  PS --> CAP["Caption dense score<br/>Chroma cosine similarity"]
+  PS --> IMGSIM["Image dense score<br/>real CLIP text↔image cosine similarity"]
+  CAP --> BLEND2["dense = mean(caption, image)<br/>caption-only if no stored embedding"]
+  IMGSIM --> BLEND2
+  SYM --> BLEND["score = α·symbolic + (1−α)·dense<br/>α scaled by parse confidence,<br/>0 if nothing was recognized"]
+  BLEND2 --> BLEND
   BLEND --> RANK["Ranked results"]
 ```
 
-The query path only ever touches the lightweight parser and an approximate nearest-neighbor lookup, never a heavy model at request time, which is what makes the scalability argument in `Working_notes.md` §13 hold at any catalog size.
+The query path only ever touches the lightweight parser, an LLM call (if configured), and approximate nearest-neighbor lookups, never a heavy model retrained at request time, which is what makes the scalability argument in `Working_notes.md` §13/§13.1 hold at any catalog size.
 
 ## Tech stack
 
@@ -79,23 +94,26 @@ The query path only ever touches the lightweight parser and an approximate neare
 ```
 strand/
 ├── Working_notes.md      # architecture options, dataset plan, tradeoffs, open decisions
-├── .github/workflows/ci.yml   # backend pytest + frontend build/lint on push/PR
+├── .github/workflows/ci.yml   # backend pytest + ruff + frontend build/lint on push/PR
 ├── docker-compose.yml     # backend + frontend, wired together
 ├── backend/
 │   ├── Dockerfile
+│   ├── pyproject.toml     # ruff config
 │   ├── .env.example       # env vars, documented; sane defaults without a .env at all
 │   ├── scripts/
-│   │   ├── pull_fashionpedia_sample.py   # regenerates real_catalog_sample.json + images
-│   │   ├── eval_baselines.py             # dense-only vs. hybrid comparison
-│   │   ├── eval_clip_baseline.py         # real vanilla-CLIP image baseline
+│   │   ├── search.py                     # plain CLI: python scripts/search.py "a query"
+│   │   ├── pull_fashionpedia_sample.py   # regenerates real_catalog_sample.json + images (1,000)
+│   │   ├── eval_baselines.py             # Tier 1: dense-only vs. hybrid comparison
+│   │   ├── eval_clip_baseline.py         # Tier 2: real vanilla-CLIP image baseline
 │   │   ├── tag_real_catalog_scene_style.py   # zero-shot CLIP tagging, tried and not applied, see Working_notes.md §12.3
+│   │   ├── tune_alpha.py                 # empirical alpha sweep, see Working_notes.md §8
 │   │   ├── build_image_vector_index.py   # Part A batch driver: real CLIP feature extraction + persistent storage
 │   │   └── extract_attributes_with_vlm.py   # fills in color/scene/style via Gemini, needs GEMINI_API_KEY
 │   ├── tests/                  # pytest suite, see Testing below
 │   └── app/
 │       ├── schema.py          # Pydantic models, incl. the shared ExtractedAttributes schema
 │       ├── observability.py   # structured logging + OpenTelemetry (console exporter)
-│       ├── data/               # mock decoy-pair records, a real Fashionpedia sample, real photos
+│       ├── data/               # mock decoy-pair records, the real Fashionpedia sample, real photos
 │       ├── services/
 │       │   ├── query_parsing.py       # entry point: real LLM parser, falls back to keywords
 │       │   ├── query_parser.py        # keyword-spotting fallback parser
@@ -103,8 +121,11 @@ strand/
 │       │   ├── vlm_attribute_extractor.py  # real Gemini image attribute extractor
 │       │   ├── gemini_client.py       # shared Gemini SDK wrapper
 │       │   ├── catalog.py         # loads/caches the combined catalog
-│       │   ├── vector_store.py    # dense similarity via a local Chroma collection
-│       │   ├── retriever.py       # weighted-hybrid scoring (symbolic + dense)
+│       │   ├── vector_store.py    # caption dense similarity via a local Chroma collection
+│       │   ├── image_similarity.py    # real CLIP image-pixel similarity, query text vs. stored embeddings
+│       │   ├── garment_vocabulary.py   # curated garment-type synonym canonicalization
+│       │   ├── retriever.py       # weighted-hybrid scoring (symbolic + blended dense)
+│       │   ├── clip_model.py      # shared local CLIP model, used by indexer.py and image_similarity.py
 │       │   ├── indexer.py         # Part A: real CLIP feature extraction, no API key needed
 │       │   └── image_vector_store.py  # persistent Chroma collection for real image embeddings
 │       └── routers/            # /api/query, /api/catalog, /api/index
@@ -145,15 +166,25 @@ docker compose up --build
 
 Serves the frontend at `http://localhost:5173` (nginx, proxying `/api/*` server-side to the backend container — no CORS involved) and the backend directly at `http://localhost:8000`. First boot downloads the ~80MB Chroma embedding model before the backend responds to anything; a named volume (`chroma-cache`) persists it so this only happens once. Copy `backend/.env.example` to `backend/.env` and uncomment the `env_file` line in `docker-compose.yml` to pass real env vars through.
 
+## Search from the command line
+
+```bash
+cd backend
+python scripts/search.py "a red tie and a white shirt in a formal setting"
+```
+
+The literal Part B requirement, "a script that accepts a natural language string and returns the top k matching images", as a plain one-line CLI, no server or browser needed. Uses the exact same code path the API uses (`query_parsing.parse_query` + `retriever.search`), so it automatically uses the real LLM parser once `GEMINI_API_KEY` is set, and the same keyword-spotting fallback otherwise, no separate implementation to drift out of sync. `--top-k` and `--alpha` are optional.
+
 ## Testing
 
 ```bash
 cd backend
 pip install -r requirements-dev.txt
+ruff check .
 pytest -v
 ```
 
-Tests run with `STRAND_DISABLE_EMBEDDINGS=1` (set in `tests/conftest.py`) so they exercise the deterministic word-overlap fallback instead of downloading the real embedding model — fast and network-independent. `tests/test_eval_accuracy.py` runs the 5 canonical eval queries from `Working_notes.md` end to end and checks retrieval accuracy, not just unit-level correctness. CI (`.github/workflows/ci.yml`) runs this suite plus a frontend build/lint on every push and PR.
+Tests run with `STRAND_DISABLE_EMBEDDINGS=1` (set in `tests/conftest.py`) so they exercise the deterministic word-overlap fallback instead of downloading the real embedding model — fast and network-independent. `tests/test_eval_accuracy.py` runs the 5 canonical eval queries from `Working_notes.md` end to end and checks retrieval accuracy, not just unit-level correctness. CI (`.github/workflows/ci.yml`) runs `ruff check`, this pytest suite, and a frontend build/lint on every push and PR.
 
 ## Baseline comparison
 
@@ -164,7 +195,7 @@ pip install -r scripts/requirements-eval.txt
 python scripts/eval_clip_baseline.py                   # real vanilla-CLIP image baseline
 ```
 
-Real numbers, not just theory: dense-only ties the hybrid on the 5 curated eval queries, but produces an *exact* score tie on the compositional decoy pair (it truly cannot tell "red tie, white shirt" from "white tie, red shirt" apart), while real vanilla CLIP on actual Fashionpedia photos scores worse than even that dense fallback (mean recall@5 0.256 vs. 0.564) on single-garment queries. See `Working_notes.md` §12 for the full breakdown and caveats.
+Real numbers, not just theory: dense-only ties the hybrid on the 5 curated eval queries, but produces an *exact* score tie on the compositional decoy pair (it truly cannot tell "red tie, white shirt" from "white tie, red shirt" apart). On the real 1,000-photo catalog, real vanilla CLIP, our dense-only fallback, and our hybrid score 0.725 / 0.850 / **1.000** mean precision@5 across 8 single-garment probe queries against Fashionpedia's own ground truth. See `Working_notes.md` §12 for the full breakdown, why precision@5 replaced recall@5 as the meaningful metric once the catalog grew past a few hundred images, and the caveats.
 
 ## Part A: real feature extraction
 
@@ -174,7 +205,7 @@ pip install -r scripts/requirements-eval.txt
 python scripts/build_image_vector_index.py
 ```
 
-Runs every real Fashionpedia photo on disk through a local CLIP model (`open_clip`, no API key) and persists a real embedding per image to an on-disk Chroma collection at `app/data/image_vector_index/` (gitignored, regenerable). This is genuine feature extraction from pixels, not from labels, closing the literal Part A requirement the mocked catalog alone doesn't. It doesn't touch color, scene, or style; that axis needs a real VLM call, see below.
+Runs every real Fashionpedia photo on disk through a local CLIP model (`open_clip`, no API key) and persists a real embedding per image to an on-disk Chroma collection at `app/data/image_vector_index/` (gitignored, regenerable). This is genuine feature extraction from pixels, not from labels, closing the literal Part A requirement the mocked catalog alone doesn't. It doesn't touch color, scene, or style; that axis needs a real VLM call, see below. These embeddings aren't just persisted, `/api/query` actually reads them back at query time (`services/image_similarity.py`), encoding the query through the same model's text tower so it lands in the same joint space, real image-pixel similarity blended into ranking, not a stored-and-forgotten side effect.
 
 ## Real LLM and VLM integration (needs a Gemini API key)
 
@@ -197,14 +228,15 @@ Two real Gemini call sites, both code-complete and unit-tested, neither exercise
 |---|---|---|
 | `POST` | `/api/query` | Parses a natural-language query and returns ranked, scored matches from the catalog |
 | `GET` | `/api/catalog` | Returns the full indexed catalog |
-| `POST` | `/api/index` | Part A: real CLIP feature extraction for one image. 200 with the embedding dimension on success, 404 if the file doesn't exist, 503 if `torch`/`open_clip` aren't installed in this deployment |
+| `POST` | `/api/index` | Part A: real CLIP feature extraction for one image. 200 with the embedding dimension on success, 404 if the file doesn't exist, 503 if `torch`/`open_clip` aren't installed in this deployment. Optionally accepts `garments`/`scene`/`style`, which additionally registers the image into the live catalog so it's immediately searchable (the cold-start fix, see `Working_notes.md` §14.3) |
 
 ## Status and limitations
 
 Partway from mocked to real, not a finished system:
 
-- The catalog combines 12 hand-written mock records with 40 real Fashionpedia records; garment detection on the real records uses the dataset's own labels, but `color`, `scene`, and `style` stay `null` there until `scripts/extract_attributes_with_vlm.py` is actually run with a key.
+- The catalog is 1,000 real Fashionpedia records plus 12 hand-written mock records. Garment detection on the real records uses the dataset's own ground-truth labels, but `color`, `scene`, and `style` stay `null` there until `scripts/extract_attributes_with_vlm.py` is actually run with a key.
 - The real LLM query parser and VLM attribute extractor are written and unit-tested (mocked/error-path tests only, no real API call made in CI) but not yet exercised against a live Gemini key. Until a key is set, `/api/query` transparently uses the keyword-spotting fallback, same as before this was added.
-- Dense retrieval uses real embeddings (Chroma, local, no API key); symbolic retrieval and the weighted-hybrid blend are real. Real image feature extraction (Part A) is implemented via local CLIP, see above.
+- Dense retrieval blends two real signals (caption-text similarity and real CLIP image-pixel similarity); symbolic retrieval (with garment-type synonym canonicalization) and the weighted-hybrid blend are real. Real image feature extraction (Part A) is implemented via local CLIP and is now actually consulted at query time, not just persisted.
+- Constructing the caption-embedding index (`DenseScorer`) at process startup takes roughly 20 seconds against the full 1,000+12 record catalog, measured directly, a one-time cost paid once per process (server startup or CLI invocation), not per query; each query after that is well under a second. See `Working_notes.md` §14 for the measurement.
 
-See `Working_notes.md` sections 9 through 13 for the full list of decisions made, what's still open, the testing/CI/observability setup, the empirical baseline comparison, and a measured scaling estimate.
+See `Working_notes.md` sections 9 through 14 for the full list of decisions made, what's still open, the testing/CI/observability setup, the empirical baseline comparison, and a measured scaling estimate.
