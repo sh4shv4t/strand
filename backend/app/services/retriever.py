@@ -12,6 +12,20 @@ query. A query with no structured signal at all has confidence pinned to
 0 effectively, since symbolic_score is 0.0 for every record regardless of
 alpha in that case, so dense similarity is reported at full strength
 rather than discounted for a symbolic signal that doesn't exist.
+
+search() scores every record in the catalog directly, no symbolic
+pre-filter. One was built and benchmarked (an in-process inverted index,
+and before that a Chroma metadata `where` filter) and both measured
+*slower* than this plain loop at every scale up to 1,000,000 records,
+including at 4.7% candidate-set selectivity. The reason is structural,
+not a tuning gap: this is a hybrid ranking, so a record with symbolic
+score 0 can still win on dense score alone, meaning dense similarity
+must be computed for every record regardless of any symbolic filter.
+Pre-filtering can therefore only ever skip the ~2 microsecond
+_symbolic_score call itself, replacing it with a same-cost set
+membership check plus the fixed cost of building the candidate set, a
+trade with no winning scale. See Working_notes.md Section 13 for the
+full investigation and measured numbers.
 """
 
 from app.schema import Garment, ImageRecord, ParsedQuery, ScoredResult
