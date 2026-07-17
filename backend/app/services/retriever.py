@@ -52,6 +52,27 @@ def get_dense_scorer() -> DenseScorer:
     return _DENSE_SCORER
 
 
+def register_record(record: ImageRecord) -> None:
+    """Adds a newly indexed image to the live catalog and its caption
+    index so it is immediately searchable via search(). This is the
+    cold-start fix: routers/index.py's index_image() call already
+    persisted a real CLIP embedding for a new image (Part A), but
+    nothing added the image to the catalog itself, so it could never
+    actually be returned by a query. _CATALOG is the same list object
+    get_catalog() returns (not a copy), so appending here is visible to
+    every other module holding that reference, no separate propagation
+    needed.
+
+    image_similarity needs no equivalent registration call: unlike
+    DenseScorer's caption collection, it re-queries image_vector_store's
+    persistent collection directly on every call, so a newly stored
+    embedding is already visible there the moment index_image() persists
+    it, before this function ever runs.
+    """
+    _CATALOG.append(record)
+    _DENSE_SCORER.add_record(record)
+
+
 def _garment_matches(query_garment: Garment, record_garments: list[Garment]) -> bool:
     for rg in record_garments:
         if rg.slot != query_garment.slot:

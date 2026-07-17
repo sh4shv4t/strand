@@ -67,6 +67,18 @@ class DenseScorer:
     def using_real_embeddings(self) -> bool:
         return self._collection is not None
 
+    def add_record(self, record: ImageRecord) -> None:
+        """Adds one record to the live collection so it is immediately
+        dense-searchable. self._records is not touched here: callers
+        (retriever.register_record) already share that same list object
+        with _CATALOG, so it is already up to date by the time this
+        runs. No-op when real embeddings are disabled, the word-overlap
+        fallback re-scans self._records directly on every call, nothing
+        to update ahead of time.
+        """
+        if self._collection is not None:
+            self._collection.add(ids=[record.id], documents=[record.caption])
+
     def score(self, raw_query: str) -> dict[str, float]:
         if self._collection is not None:
             try:
