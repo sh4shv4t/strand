@@ -14,13 +14,15 @@ def test_missing_file_raises_file_not_found():
 
 def test_raises_when_not_configured(monkeypatch, tmp_path):
     import app.services.gemini_client as gemini_client_module
-    from PIL import Image
 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setattr(gemini_client_module, "_client", None)
 
+    # GeminiNotConfigured fires from get_client() before generate_structured
+    # ever sends the image anywhere, so the file just needs to exist, its
+    # bytes are never inspected. No need for a real image / Pillow here.
     image_path = tmp_path / "test.jpg"
-    Image.new("RGB", (32, 32), color=(10, 20, 30)).save(image_path)
+    image_path.write_bytes(b"not a real jpeg")
 
     with pytest.raises(GeminiNotConfigured):
         extract_attributes(str(image_path))
