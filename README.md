@@ -99,7 +99,7 @@ Query parsing and image attribute extraction each go through a single, swappable
 | Task | Default | Open-source alternatives |
 |---|---|---|
 | Query parsing (text → structured schema) | Gemini 2.0 Flash | Llama 3.1/3.3, Qwen2.5, Mistral, any instruction-tuned model with structured/JSON output, self-hosted via Ollama or vLLM |
-| Image attribute extraction (photo → garments/scene/style) | Gemini 2.0 Flash | Florence-2 (a LoRA-tuned 0.77B Florence-2 has been shown to beat GPT-4o-mini and Gemini Flash on this exact fashion-JSON task), or general vision-language models like Qwen2-VL, LLaVA-NeXT, InternVL2 |
+| Image attribute extraction (photo → scene/style) | Gemini 2.0 Flash | Florence-2 (a LoRA-tuned 0.77B Florence-2 has been shown to beat GPT-4o-mini and Gemini Flash on this exact fashion-JSON task), or general vision-language models like Qwen2-VL, LLaVA-NeXT, InternVL2 |
 | Image feature extraction | Marqo-FashionCLIP | already open-source and local by default, no API key involved |
 
 Both the image embeddings and the retrieval logic run entirely locally with no API key. An LLM/VLM key only unlocks open-vocabulary query parsing and automated attribute tagging; without one, the system uses a lightweight rule-based parser and the dataset's own ground-truth garment labels, the same retrieval pipeline either way.
@@ -108,6 +108,7 @@ Both the image embeddings and the retrieval logic run entirely locally with no A
 
 - **[Fashionpedia](https://huggingface.co/datasets/detection-datasets/fashionpedia)** (CC-BY-4.0), real street-style, daily-life, and event photography with ground-truth garment category and bounding-box labels. 1,000 images are sampled from its validation split (`scripts/pull_fashionpedia_sample.py`), and garment slot/type detection comes directly from the dataset's own labels, no manual annotation or model-based labeling involved.
 - **A small hand-authored set** (12 records) built specifically to isolate the compositional-binding case: a color-swapped decoy pair ("a red tie and a white shirt" vs. "a white tie and a red shirt") that natural photography can't reliably provide, since it needs two images differing by exactly one color-attribute swap and nothing else.
+- **Garment color on the real photos** is read directly from Fashionpedia's own ground-truth bounding boxes (`services/color_detection.py`): crop the box, read the dominant pixel color, map it to the nearest name in the app's own color vocabulary, no VLM call needed for this axis. All 2,790 garments in the current catalog have a detected color this way.
 - Scene and style labels beyond what a dataset provides natively are filled in through the VLM attribute-extraction pipeline described above, not scraped or guessed.
 
 ## Tech stack
@@ -134,7 +135,7 @@ strand/
 │   │   ├── eval_clip_baseline.py         # vanilla-CLIP baseline comparison
 │   │   ├── tune_alpha.py                 # empirical alpha sweep
 │   │   ├── build_image_vector_index.py   # real CLIP feature extraction + storage
-│   │   └── extract_attributes_with_vlm.py   # fills in color/scene/style via a VLM
+│   │   └── extract_attributes_with_vlm.py   # fills in scene/style via a VLM
 │   ├── tests/
 │   └── app/
 │       ├── schema.py          # Pydantic models shared by indexing and retrieval
@@ -153,7 +154,8 @@ strand/
 │       │   ├── retriever.py       # weighted-hybrid scoring
 │       │   ├── clip_model.py      # shared local CLIP model
 │       │   ├── indexer.py         # real CLIP feature extraction
-│       │   └── image_vector_store.py  # persistent Chroma collection for image embeddings
+│       │   ├── image_vector_store.py  # persistent Chroma collection for image embeddings
+│       │   └── color_detection.py     # deterministic garment color from real bounding boxes
 │       └── routers/            # /api/query, /api/catalog, /api/index
 └── frontend/
     └── src/
