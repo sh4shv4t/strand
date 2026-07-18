@@ -1,4 +1,3 @@
 -r ../requirements.txt
 datasets==5.0.0
-pillow
 open_clip_torch

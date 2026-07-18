@@ -5,11 +5,11 @@
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-10B981?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/frontend-React%2019-4338CA?logo=react&logoColor=white)
 ![Docker](https://img.shields.io/badge/deploy-Docker%20Compose-10B981?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-59%20passing-4338CA)
+![Tests](https://img.shields.io/badge/tests-82%20passing-4338CA)
 
 **Strand** is a compositional fashion image search engine. It answers natural-language queries like *"a red tie and a white shirt in a formal setting"* by binding garments, colors, scene, and style to separate structured fields instead of pooling an entire description into one embedding, the failure mode that makes vanilla CLIP-style search confuse *"red tie, white shirt"* with *"white tie, red shirt."*
 
-On a 1,000-photo real-world catalog, Strand's hybrid retrieval scores a perfect **1.000 mean precision@5** against **0.725** for vanilla CLIP, backed by a 59-test suite and measured, not assumed, evaluation throughout. **[`Working_notes.md`](./Working_notes.md)** is the full engineering log behind this project, every architecture option considered, every measured result, and a few optimizations that were tried and honestly reported as not working out.
+On a 1,000-photo real-world catalog, Strand's hybrid retrieval scores a perfect **1.000 mean precision@5** against **0.725** for vanilla CLIP, backed by an 82-test suite and measured, not assumed, evaluation throughout. **[`Working_notes.md`](./Working_notes.md)** is the full engineering log behind this project, every architecture option considered, every measured result, and a few optimizations that were tried and honestly reported as not working out.
 
 ![Strand search UI showing the compositional query "A red tie and a white shirt in a formal setting", with the true match ranked first at 93% and its color-swapped decoy second at 53%](./assets/screenshot.png)
 
@@ -67,6 +67,10 @@ flowchart LR
 
 Three independent signals feed the final score: exact symbolic matching on the schema, caption-text similarity, and real CLIP image-pixel similarity compared against a persisted embedding per photo. A compositional query like the one above resolves almost entirely through the symbolic path; a stylistic one like *"casual weekend outfit for a city walk"* leans on the dense signals instead. The weighting adapts to how much of the query the parser actually understood, rather than trusting a fixed split for every query.
 
+Two refinements sit on top of that blend. First, garment color detected straight from a photo's own bounding box (below) is treated as a *soft* signal, a graded similarity folded into the dense blend, rather than a hard exact-match gate, since a heuristic detector is wrong at a real, nonzero rate and hard-gating on it would silently turn "unknown color" into "confidently wrong, wrongly excluded" for every miss. Second, the same query is scored twice, once as typed and once as a clean phrase rebuilt from the parser's own structured fields, and the two rankings are combined with Reciprocal Rank Fusion, so a query that embeds poorly on its literal wording can still rank well once its structured meaning is scored too. Both are covered in depth in `Working_notes.md` Sections 17 and 19.
+
+Query parsing, caption similarity, and image similarity are all cached (`functools.lru_cache`), so the example query chips and repeated searches don't re-pay for an LLM call or a CLIP encode on every hit, invalidated correctly whenever the catalog changes (`Working_notes.md` Section 18).
+
 ## Architecture
 
 ```mermaid
@@ -108,7 +112,7 @@ Both the image embeddings and the retrieval logic run entirely locally with no A
 
 - **[Fashionpedia](https://huggingface.co/datasets/detection-datasets/fashionpedia)** (CC-BY-4.0), real street-style, daily-life, and event photography with ground-truth garment category and bounding-box labels. 1,000 images are sampled from its validation split (`scripts/pull_fashionpedia_sample.py`), and garment slot/type detection comes directly from the dataset's own labels, no manual annotation or model-based labeling involved.
 - **A small hand-authored set** (12 records) built specifically to isolate the compositional-binding case: a color-swapped decoy pair ("a red tie and a white shirt" vs. "a white tie and a red shirt") that natural photography can't reliably provide, since it needs two images differing by exactly one color-attribute swap and nothing else.
-- **Garment color on the real photos** is read directly from Fashionpedia's own ground-truth bounding boxes (`services/color_detection.py`): crop the box, read the dominant pixel color, map it to the nearest name in the app's own color vocabulary, no VLM call needed for this axis. All 2,790 garments in the current catalog have a detected color this way.
+- **Garment color on the real photos** is read directly from Fashionpedia's own ground-truth bounding boxes (`services/color_detection.py`): crop the box, read the dominant pixel color, map it to the nearest name in the app's own color vocabulary, no VLM call needed for this axis. All 2,790 garments in the current catalog have a detected color this way. Because a detector can be wrong in a way a hand-authored label essentially never is, a detected color contributes a graded similarity score rather than hard-excluding a symbolic mismatch, see `Working_notes.md` Section 17.
 - Scene and style labels beyond what a dataset provides natively are filled in through the VLM attribute-extraction pipeline described above, not scraped or guessed.
 
 ## Tech stack
