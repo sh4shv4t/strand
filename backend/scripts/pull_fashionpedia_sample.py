@@ -81,6 +81,7 @@ def build_record(
 ) -> dict | None:
     garments = []
     seen_slots = set()
+    detected_color_slots = []
 
     for name, bbox in zip(category_names, bboxes):
         mapped = SLOT_MAP.get(name)
@@ -92,9 +93,12 @@ def build_record(
 
         try:
             color = detect_color(image, bbox)
+            detected_color_slots.append(slot)
         except (ValueError, OSError):
             # A degenerate (zero-area) box or unreadable region, honestly
             # null rather than a guess, exactly like scene/style below.
+            # Not added to detected_color_slots since there's no color
+            # here at all, confident or detected.
             color = None
 
         garments.append({"slot": slot, "type": garment_type, "color": color})
@@ -115,6 +119,7 @@ def build_record(
         "notable": [],
         "caption": caption,
         "swatch": [],
+        "detected_color_slots": detected_color_slots,
     }
 
 

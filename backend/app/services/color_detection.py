@@ -48,6 +48,31 @@ def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
 
 _CANONICAL_RGB: dict[str, tuple[int, int, int]] = {name: _hex_to_rgb(hex_) for name, hex_ in COLOR_HEX.items()}
 
+# The largest possible distance between two points in 8-bit RGB space
+# (black to white), used to normalize color_similarity() into [0, 1].
+_MAX_RGB_DISTANCE = (255**2 * 3) ** 0.5
+
+
+def color_similarity(name_a: str, name_b: str) -> float:
+    """Graded similarity in [0, 1] between two canonical color names, 1.0
+    for an exact match, lower the further apart their RGB anchors are,
+    0.0 for the theoretical opposite ends of RGB space. Unknown names
+    score 0.0 rather than raising, callers already only pass names drawn
+    from COLOR_HEX.
+
+    This exists specifically so a detected color that's plausibly close
+    (khaki vs. beige) isn't scored identically to one that's actually
+    wrong (khaki vs. black): retriever.py uses this as a soft signal for
+    RGB-detected colors instead of the hard equality check confidently-
+    sourced colors get, see Working_notes.md Section 17 for why treating
+    every detected color as equally hard-gated was the wrong call.
+    """
+    rgb_a, rgb_b = _CANONICAL_RGB.get(name_a), _CANONICAL_RGB.get(name_b)
+    if rgb_a is None or rgb_b is None:
+        return 0.0
+    distance = sum((a - b) ** 2 for a, b in zip(rgb_a, rgb_b)) ** 0.5
+    return max(0.0, 1.0 - distance / _MAX_RGB_DISTANCE)
+
 
 def dominant_rgb(crop: Image.Image) -> tuple[int, int, int]:
     """Per-channel median RGB across the crop's pixels. Median rather than

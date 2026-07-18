@@ -42,6 +42,16 @@ class ImageRecord(BaseModel):
     notable: list[str] = Field(default_factory=list)
     caption: str
     swatch: list[str] = Field(default_factory=list)
+    # Slots whose color came from color_detection.py's RGB read rather
+    # than a hand-authored or VLM-confirmed source. Kept off Garment
+    # itself (and off ExtractedAttributes/ParsedQuery, which Garment is
+    # also shared with) specifically so it never becomes a field the
+    # Gemini structured-output schema asks the LLM to fill in, this is
+    # bookkeeping the retriever consults, not something to extract from
+    # a query. retriever.py uses this to treat a detected color as a
+    # soft signal instead of the hard symbolic gate a confident color
+    # gets, see Working_notes.md Section 17.
+    detected_color_slots: list[str] = Field(default_factory=list)
 
 
 class ParsedQuery(BaseModel):

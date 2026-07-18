@@ -4,7 +4,7 @@ prove the color math itself is correct."""
 
 from PIL import Image
 
-from app.services.color_detection import _inset, detect_color, dominant_rgb, nearest_color_name
+from app.services.color_detection import _inset, color_similarity, detect_color, dominant_rgb, nearest_color_name
 
 
 def test_dominant_rgb_of_a_solid_color_image_is_exact():
@@ -58,3 +58,22 @@ def test_inset_leaves_a_too_small_box_unchanged_rather_than_collapsing_it():
     # 15% of a 4px box rounds to 0px trimmed either way, but a box this
     # small must never be allowed to shrink to zero area.
     assert _inset(0, 0, 4, 4, 0.5) == (0, 0, 4, 4)
+
+
+def test_color_similarity_is_1_for_an_exact_match():
+    assert color_similarity("red", "red") == 1.0
+
+
+def test_color_similarity_ranks_perceptually_close_colors_higher():
+    # khaki and beige are both light warm tones; khaki and black are not.
+    close = color_similarity("khaki", "beige")
+    far = color_similarity("khaki", "black")
+    assert close > far
+
+
+def test_color_similarity_is_symmetric():
+    assert color_similarity("navy", "red") == color_similarity("red", "navy")
+
+
+def test_color_similarity_of_an_unknown_name_is_zero_not_an_error():
+    assert color_similarity("mauve", "red") == 0.0

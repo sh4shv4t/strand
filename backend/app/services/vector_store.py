@@ -3,10 +3,19 @@
 Isolated from retriever.py so it can be swapped or mocked independently:
 retriever.py only depends on `DenseScorer.score(query) -> {id: similarity}`,
 not on Chroma itself.
+
+score() is cached (see _score_cached): encoding the query text is the
+real cost here, not looking it up, so a repeated query (the example
+chips, anything a user re-runs) should not pay to re-embed. Cached
+per-record results depend on which records are in the collection at the
+time, so retriever.register_record() clears this cache (clear_cache())
+whenever a new record is added, otherwise a query cached before that
+addition would keep returning a result missing the new record.
 """
 
 import os
 import re
+from functools import lru_cache
 
 import chromadb
 
@@ -80,6 +89,12 @@ class DenseScorer:
             self._collection.add(ids=[record.id], documents=[record.caption])
 
     def score(self, raw_query: str) -> dict[str, float]:
+        # A copy, not the cached dict itself: callers must not be able to
+        # mutate what every future identical query gets back.
+        return dict(self._score_cached(raw_query))
+
+    @lru_cache(maxsize=256)
+    def _score_cached(self, raw_query: str) -> dict[str, float]:
         if self._collection is not None:
             try:
                 result = self._collection.query(
@@ -95,3 +110,9 @@ class DenseScorer:
                 pass
 
         return {record.id: _word_overlap_score(raw_query, record.caption) for record in self._records}
+
+    def clear_cache(self) -> None:
+        """Called by retriever.register_record() whenever a new record is
+        added, a query cached before that would otherwise keep returning
+        a result missing the addition."""
+        self._score_cached.cache_clear()

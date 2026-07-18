@@ -4,8 +4,15 @@ exercise symbolic scoring and score blending against the real catalog."""
 
 import pytest
 
-from app.schema import ParsedQuery
-from app.services.retriever import _blend_dense, get_catalog, search
+from app.schema import ImageRecord, ParsedQuery, ScoredResult
+from app.services.retriever import (
+    _blend_dense,
+    _canonical_phrase,
+    _reciprocal_rank_fusion,
+    get_catalog,
+    register_record,
+    search,
+)
 
 
 def _find(results, record_id: str):
@@ -114,6 +121,111 @@ def test_blend_dense_falls_back_to_caption_only_without_an_image_embedding():
     CLIP embedding, image_similarity.score() simply won't have an entry
     for them, this is that case."""
     assert _blend_dense(0.4, None) == 0.4
+
+
+def test_register_record_makes_a_new_record_visible_to_a_repeated_query():
+    """DenseScorer.score() is cached (Working_notes.md Section 18): a
+    query run once before a record is registered must still find it on
+    a repeat, proving register_record's clear_cache() call actually
+    drops the stale entry rather than leaving it to expire on its own."""
+    parsed = ParsedQuery(raw_query="a distinctive unregistered garment query")
+
+    before_ids = {r.record.id for r in search(parsed, top_k=len(get_catalog()))}
+    assert "new_test_record" not in before_ids
+
+    register_record(
+        ImageRecord(
+            id="new_test_record",
+            garments=[{"slot": "upper", "type": "shirt", "color": "white"}],
+            caption="a distinctive unregistered garment query",
+        )
+    )
+
+    after_ids = {r.record.id for r in search(parsed, top_k=len(get_catalog()))}
+    assert "new_test_record" in after_ids
+
+
+def test_canonical_phrase_reuses_matched_fields_label_format():
+    parsed = ParsedQuery(
+        raw_query="irrelevant",
+        garments=[
+            {"slot": "upper", "type": "shirt", "color": "white"},
+            {"slot": "accessory", "type": "tie", "color": "red"},
+        ],
+        scene="office",
+        style="formal",
+    )
+    assert _canonical_phrase(parsed) == "white shirt, red tie, office, formal"
+
+
+def test_canonical_phrase_is_none_without_any_structured_signal():
+    parsed = ParsedQuery(raw_query="some free text with no schema signal")
+    assert _canonical_phrase(parsed) is None
+
+
+def _fusion_candidate(record_id: str, score: float) -> ScoredResult:
+    return ScoredResult(
+        record=ImageRecord(id=record_id, garments=[], caption=""),
+        score=score,
+        symbolic_score=0.0,
+        dense_score=score,
+        matched_fields=[],
+    )
+
+
+def test_reciprocal_rank_fusion_promotes_a_record_that_ranks_well_in_both_lists():
+    """"b" has the single highest raw score in `primary`, but ranks last
+    in `secondary`. "a" ranks 2nd/1st across the two lists, better on
+    average, RRF (rank-based, not score-based) must place it ahead of
+    "b" despite "b" winning on primary's score alone."""
+    primary = [_fusion_candidate("a", 0.5), _fusion_candidate("b", 0.9), _fusion_candidate("c", 0.1)]
+    secondary = [_fusion_candidate("a", 0.9), _fusion_candidate("c", 0.5), _fusion_candidate("b", 0.1)]
+
+    fused = _reciprocal_rank_fusion(primary, secondary)
+    fused_ids = [r.record.id for r in fused]
+
+    assert fused_ids.index("a") < fused_ids.index("b")
+
+
+def test_reciprocal_rank_fusion_returns_primarys_own_result_objects():
+    """The score/symbolic_score/dense_score/matched_fields a caller sees
+    must always come from `primary` (the raw-query pass), never
+    `secondary`, RRF only reorders, it never substitutes a different
+    scoring pass's reported numbers."""
+    primary = [_fusion_candidate("a", 0.5), _fusion_candidate("b", 0.9)]
+    secondary = [_fusion_candidate("a", 0.9), _fusion_candidate("b", 0.1)]
+
+    fused = _reciprocal_rank_fusion(primary, secondary)
+
+    by_id = {r.record.id: r for r in fused}
+    assert by_id["a"].score == 0.5
+    assert by_id["b"].score == 0.9
+
+
+def test_rrf_only_changes_order_not_the_reported_score_fields(monkeypatch):
+    """search() with RRF enabled must report the exact same
+    score/symbolic_score/dense_score/matched_fields per record as the
+    raw-query-only pass, RRF is only ever allowed to reorder the list."""
+    parsed = ParsedQuery(
+        raw_query="some vague phrasing that barely resembles anything",
+        garments=[{"slot": "upper", "type": "shirt", "color": "white"}],
+        style="business",
+    )
+
+    with_rrf = {r.record.id: r for r in search(parsed, top_k=len(get_catalog()))}
+
+    import app.services.retriever as retriever_module
+
+    monkeypatch.setattr(retriever_module, "_canonical_phrase", lambda p: None)
+    without_rrf = {r.record.id: r for r in search(parsed, top_k=len(get_catalog()))}
+
+    assert with_rrf.keys() == without_rrf.keys()
+    for record_id, result in with_rrf.items():
+        baseline = without_rrf[record_id]
+        assert result.score == baseline.score
+        assert result.symbolic_score == baseline.symbolic_score
+        assert result.dense_score == baseline.dense_score
+        assert result.matched_fields == baseline.matched_fields
 
 
 def test_scene_and_style_match_contribute_to_score():

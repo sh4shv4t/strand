@@ -24,3 +24,20 @@ def test_falls_back_when_llm_parser_raises_unexpectedly(monkeypatch):
     # the keyword parser, not take the whole request down with it.
     parsed = parse_query("A bright yellow raincoat")
     assert any(g.type == "raincoat" and g.color == "yellow" for g in parsed.garments)
+
+
+def test_repeated_identical_query_returns_independent_copies():
+    """parse_query() is cached (see module docstring): ParsedQuery is a
+    mutable Pydantic model, so the cache must hand back a deep copy each
+    time, not the cached instance itself, otherwise a caller mutating
+    one result (e.g. routers/query.py adjusting garments in place) would
+    corrupt what every future identical query gets back."""
+    first = parse_query("a red tie and a white shirt in a formal setting")
+    second = parse_query("a red tie and a white shirt in a formal setting")
+
+    assert first == second
+    assert first is not second
+
+    first.garments.append({"slot": "footwear", "type": "boot", "color": "black"})
+    third = parse_query("a red tie and a white shirt in a formal setting")
+    assert len(third.garments) == len(second.garments)
